@@ -1,0 +1,28 @@
+[Unit]
+Description=ClaudeForge Server (User Service)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/code/ai/mcp_proxy
+ExecStart=/usr/bin/node %h/code/ai/mcp_proxy/dist/index.js
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment="NODE_ENV=production"
+Environment="CLAUDEFORGE_CONFIG=%h/code/ai/mcp_proxy/config.json"
+Environment="CLAUDEFORGE_PORT=3000"
+Environment="CLAUDEFORGE_WEB_PORT=8080"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+# No restrictions - runs with full user permissions
+PrivateDevices=no
+ProtectSystem=no
+ProtectHome=no
+
+[Install]
+WantedBy=default.target

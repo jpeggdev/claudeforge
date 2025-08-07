@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaudeForge Dashboard</title>
+    <meta name="author" content="Jeff Pegg">
+    <meta name="description" content="ClaudeForge - MCP Server Orchestration Platform">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f7f9fc;
+            --bg-secondary: #ffffff;
+            --bg-accent: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-success: linear-gradient(135deg, #66d9a0 0%, #40c98e 100%);
+            --bg-warning: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);
+            --bg-danger: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            --bg-info: linear-gradient(135deg, #54a0ff 0%, #5f7cff 100%);
+            
+            --purple-primary: #667eea;
+            --purple-dark: #5a67d8;
+            --purple-light: #e9ecff;
+            
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --text-light: #a0aec0;
+            
+            --border-light: #e2e8f0;
+            --border-default: #cbd5e0;
+            
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.16);
+            --shadow-colored: 0 8px 24px rgba(102, 126, 234, 0.25);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rubik', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-light);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--bg-accent);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: white;
+            box-shadow: var(--shadow-colored);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Server List */
+        .server-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .server-list-header {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        .server-item {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .server-item:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .server-item.selected {
+            background: white;
+            border-color: var(--purple-primary);
+            box-shadow: var(--shadow-colored);
+        }
+
+        .server-item.connected .server-name::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #40c98e;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        .server-item.disabled {
+            opacity: 0.6;
+        }
+
+        .server-item.disabled .server-info {
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .server-item.error .server-name::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .server-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .server-info {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .stat-card.active::before {
+            background: var(--bg-success);
+        }
+
+        .stat-card.servers::before {
+            background: var(--bg-accent);
+        }
+
+        .stat-card.tools::before {
+            background: var(--bg-info);
+        }
+
+        .stat-card.resources::before {
+            background: var(--bg-warning);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-icon.active {
+            background: linear-gradient(135deg, #66d9a0 0%, #40c98e 100%);
+        }
+
+        .stat-icon.servers {
+            background: var(--bg-accent);
+        }
+
+        .stat-icon.tools {
+            background: var(--bg-info);
+        }
+
+        .stat-icon.resources {
+            background: var(--bg-warning);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Tabs */
+        .tab-container {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            font-family: 'Rubik', sans-serif;
+        }
+
+        .tab:hover {
+            background: white;
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            background: white;
+            color: var(--purple-primary);
+            box-shadow: var(--shadow-sm);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Tool Cards */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .tool-card {
+            background: var(--bg-primary);
+            border-radius: 16px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .tool-card:hover {
+            background: white;
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+            border-color: var(--purple-light);
+        }
+
+        .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tool-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Rubik', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--bg-accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-colored);
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border: 2px solid var(--border-light);
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: var(--purple-primary);
+            border-color: var(--purple-primary);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border-light);
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background: var(--bg-accent);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Search */
+        .search-container {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 2.75rem;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-light);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            font-family: 'Rubik', sans-serif;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--purple-primary);
+            background: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+        }
+
+        /* Logs */
+        .logs-container {
+            height: 400px;
+            overflow-y: auto;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 1rem;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .log-entry {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: start;
+            gap: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .log-entry:hover {
+            box-shadow: var(--shadow-sm);
+        }
+
+        .log-timestamp {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .log-level {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .log-level.error {
+            background: #fee;
+            color: #c53030;
+        }
+
+        .log-level.warning {
+            background: #fffaf0;
+            color: #d69e2e;
+        }
+
+        .log-level.info {
+            background: #ebf8ff;
+            color: #2b6cb0;
+        }
+
+        .log-message {
+            flex: 1;
+            color: var(--text-secondary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-default);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .dashboard {
+                grid-template-columns: 240px 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                display: none;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">CF</div>
+                <div class="logo-text">
+                    <h1>ClaudeForge</h1>
+                    <p>Control Dashboard</p>
+                </div>
+            </div>
+
+            <div class="server-list">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div class="server-list-header" style="margin: 0;">Connected Servers</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button onclick="app.reloadConfig()" style="background: none; border: none; cursor: pointer; font-size: 1.25rem; padding: 0.25rem;" title="Reload config.json">📄</button>
+                        <button onclick="app.refreshServers()" style="background: none; border: none; cursor: pointer; font-size: 1.25rem; padding: 0.25rem;" title="Refresh servers">🔄</button>
+                    </div>
+                </div>
+                <div id="server-list"></div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="stats-grid">
+                <div class="stat-card active">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value">Online</div>
+                            <div class="stat-label">System Status</div>
+                        </div>
+                        <div class="stat-icon active">✓</div>
+                    </div>
+                </div>
+
+                <div class="stat-card servers">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="server-count">0</div>
+                            <div class="stat-label">Active Servers</div>
+                        </div>
+                        <div class="stat-icon servers">🖥️</div>
+                    </div>
+                </div>
+
+                <div class="stat-card tools">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="tool-count">0</div>
+                            <div class="stat-label">Available Tools</div>
+                        </div>
+                        <div class="stat-icon tools">🛠️</div>
+                    </div>
+                </div>
+
+                <div class="stat-card resources">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="resource-count">0</div>
+                            <div class="stat-label">Resources</div>
+                        </div>
+                        <div class="stat-icon resources">📦</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-container">
+                <div class="tabs">
+                    <button class="tab active" data-tab="tools">Tools</button>
+                    <button class="tab" data-tab="resources">Resources</button>
+                    <button class="tab" data-tab="prompts">Prompts</button>
+                    <button class="tab" data-tab="server-logs">Server Logs</button>
+                    <button class="tab" data-tab="system-logs">System Logs</button>
+                </div>
+
+                <div class="tab-content active" id="tools-tab">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" placeholder="Search tools..." id="tool-search">
+                    </div>
+                    <div class="tools-grid" id="tools-grid">
+                        <div class="empty-state">
+                            <div class="empty-icon">🛠️</div>
+                            <div class="empty-title">No Tools Available</div>
+                            <div class="empty-description">Select a server to view available tools</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="resources-tab">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" placeholder="Search resources..." id="resource-search">
+                    </div>
+                    <div class="tools-grid" id="resources-grid">
+                        <div class="empty-state">
+                            <div class="empty-icon">📦</div>
+                            <div class="empty-title">No Resources Available</div>
+                            <div class="empty-description">Select a server to view available resources</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="prompts-tab">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" placeholder="Search prompts..." id="prompt-search">
+                    </div>
+                    <div class="tools-grid" id="prompts-grid">
+                        <div class="empty-state">
+                            <div class="empty-icon">💬</div>
+                            <div class="empty-title">No Prompts Available</div>
+                            <div class="empty-description">Select a server to view available prompts</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="server-logs-tab">
+                    <div class="logs-controls" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <select class="search-input" id="server-log-level-filter" style="width: auto;">
+                            <option value="">All Levels</option>
+                            <option value="error">Errors</option>
+                            <option value="warning">Warnings</option>
+                            <option value="info">Info</option>
+                        </select>
+                        <select class="search-input" id="server-log-server-filter" style="width: auto;">
+                            <option value="">All Servers</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="app.clearServerLogs()">Clear Logs</button>
+                        <label style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="server-auto-scroll" checked>
+                            Auto-scroll
+                        </label>
+                    </div>
+                    <div class="logs-container" id="server-logs-container"></div>
+                </div>
+
+                <div class="tab-content" id="system-logs-tab">
+                    <div class="logs-controls" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <select class="search-input" id="system-log-level-filter" style="width: auto;">
+                            <option value="">All Levels</option>
+                            <option value="error">Errors</option>
+                            <option value="warning">Warnings</option>
+                            <option value="info">Info</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="app.clearSystemLogs()">Clear Logs</button>
+                        <label style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="system-auto-scroll" checked>
+                            Auto-scroll
+                        </label>
+                    </div>
+                    <div class="logs-container" id="system-logs-container"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

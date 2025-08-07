@@ -1,0 +1,43 @@
+{
+  "port": 3000,
+  "webPort": 8080,
+  "defaultPermissions": "allow",
+  "servers": [
+    {
+      "id": "filesystem",
+      "name": "Filesystem Server",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "transport": "stdio"
+    },
+    {
+      "id": "github",
+      "name": "GitHub Server",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "transport": "stdio",
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-github-token-here"
+      }
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL Server",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"],
+      "transport": "stdio"
+    },
+    {
+      "id": "web-server",
+      "name": "Web API Server",
+      "transport": "sse",
+      "endpoint": "http://localhost:4000/sse"
+    },
+    {
+      "id": "websocket-server",
+      "name": "WebSocket Server",
+      "transport": "websocket",
+      "endpoint": "ws://localhost:5000"
+    }
+  ]
+}
