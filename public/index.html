@@ -317,6 +317,20 @@
             box-shadow: var(--shadow-sm);
             font-weight: 600;
         }
+        
+        /* System tabs maintain their gradient backgrounds */
+        .tab.system-tab {
+            color: white !important;
+        }
+        
+        .tab.system-tab.active {
+            filter: brightness(1.2);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .tab.system-tab:hover {
+            filter: brightness(1.1);
+        }
 
         .tab-content {
             display: none;
@@ -678,12 +692,20 @@
             </div>
 
             <div class="tab-container">
-                <div class="tabs">
-                    <button class="tab active" data-tab="tools">Tools</button>
-                    <button class="tab" data-tab="resources">Resources</button>
-                    <button class="tab" data-tab="prompts">Prompts</button>
-                    <button class="tab" data-tab="server-logs">Server Logs</button>
-                    <button class="tab" data-tab="system-logs">System Logs</button>
+                <div class="tabs" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="tab active" data-tab="tools">Tools</button>
+                        <button class="tab" data-tab="resources">Resources</button>
+                        <button class="tab" data-tab="prompts">Prompts</button>
+                        <button class="tab" data-tab="server-logs">Server Logs</button>
+                    </div>
+                    <div style="width: 1px; height: 24px; background: var(--border-light); margin: 0 1rem;"></div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="font-size: 0.75rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 0.5rem;">System</span>
+                        <button class="tab system-tab" data-tab="firehose" style="background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);">🔥 Firehose</button>
+                        <button class="tab system-tab" data-tab="debug" style="background: linear-gradient(135deg, #54a0ff 0%, #5f7cff 100%);">Debug Inspector</button>
+                        <button class="tab system-tab" data-tab="system-logs" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">System Logs</button>
+                    </div>
                 </div>
 
                 <div class="tab-content active" id="tools-tab">
@@ -726,6 +748,119 @@
                             <div class="empty-description">Select a server to view available prompts</div>
                         </div>
                     </div>
+                </div>
+
+                <div class="tab-content" id="firehose-tab">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                        <button class="btn btn-primary" id="firehose-toggle-btn" onclick="app.toggleFirehose()">
+                            <span id="firehose-toggle-icon">⏸️</span>
+                            <span id="firehose-toggle-text">Pause</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="app.clearFirehose()">Clear</button>
+                        <select class="search-input" id="firehose-filter" style="width: auto;" onchange="app.updateFirehoseFilter()">
+                            <option value="">All Categories</option>
+                            <option value="mcp">MCP</option>
+                            <option value="http">HTTP</option>
+                            <option value="websocket">WebSocket</option>
+                            <option value="system">System</option>
+                            <option value="log">Logs</option>
+                            <option value="permission">Permissions</option>
+                            <option value="config">Config</option>
+                        </select>
+                        <input type="text" class="search-input" id="firehose-text-filter" placeholder="Filter text..." style="width: 200px;" oninput="app.updateFirehoseTextFilter()">
+                        <button class="btn btn-secondary" onclick="app.toggleFirehoseNoiseFilter()" id="firehose-noise-btn" title="Hide WebSocket message-out, firehose events, and other noise">
+                            <span id="firehose-noise-icon">🔇</span> Reduce Noise
+                        </button>
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="firehose-auto-scroll" checked onchange="app.updateFirehoseAutoScroll()">
+                            Auto-scroll
+                        </label>
+                        <div style="margin-left: auto; display: flex; gap: 1rem; align-items: center;">
+                            <span style="font-size: 0.875rem; color: var(--text-secondary);">
+                                Events: <strong id="firehose-event-count">0</strong>
+                            </span>
+                            <span style="font-size: 0.875rem; color: var(--text-secondary);">
+                                Rate: <strong id="firehose-event-rate">0/s</strong>
+                            </span>
+                            <span id="firehose-status" style="padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; background: #c6f6d5; color: #22543d;">STREAMING</span>
+                        </div>
+                    </div>
+                    
+                    <div id="firehose-exclusions" style="display: none; background: var(--bg-primary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Exclude Message Types:</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
+                            <label><input type="checkbox" id="exclude-ws-out" checked> WebSocket message-out</label>
+                            <label><input type="checkbox" id="exclude-ws-in" checked> WebSocket message-in</label>
+                            <label><input type="checkbox" id="exclude-firehose" checked> Firehose events</label>
+                            <label><input type="checkbox" id="exclude-stats" checked> Stats updates</label>
+                            <label><input type="checkbox" id="exclude-heartbeat" checked> Heartbeats</label>
+                            <label><input type="checkbox" id="exclude-static" checked> Static files (JS/CSS)</label>
+                            <label><input type="checkbox" id="exclude-api-status"> API status calls</label>
+                            <label><input type="checkbox" id="exclude-options"> OPTIONS requests</label>
+                        </div>
+                        <div style="margin-top: 0.5rem;">
+                            <input type="text" class="search-input" id="firehose-custom-exclude" placeholder="Custom exclusion patterns (comma-separated)" style="width: 100%;" oninput="app.updateFirehoseExclusions()">
+                        </div>
+                    </div>
+                    
+                    <textarea 
+                        id="firehose-stream" 
+                        readonly 
+                        onscroll="app.handleFirehoseScroll()"
+                        style="
+                            width: 100%;
+                            height: 600px;
+                            font-family: 'Space Mono', 'Courier New', monospace;
+                            font-size: 0.75rem;
+                            line-height: 1.4;
+                            background: #1a1a1a;
+                            color: #00ff00;
+                            border: 2px solid var(--border-light);
+                            border-radius: 12px;
+                            padding: 1rem;
+                            resize: vertical;
+                            white-space: pre;
+                            overflow: auto;
+                        "
+                        placeholder="Waiting for events..."
+                    ></textarea>
+                </div>
+
+                <div class="tab-content" id="debug-tab">
+                    <div class="debug-controls" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                        <button class="btn btn-primary" id="debug-toggle-btn" onclick="app.toggleDebug()">Enable Debugging</button>
+                        <select class="search-input" id="debug-server-filter" style="width: auto;">
+                            <option value="">All Servers</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="app.clearDebugMessages()">Clear Messages</button>
+                        <button class="btn btn-secondary" onclick="app.exportDebugData()">Export Data</button>
+                        <label style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="debug-auto-scroll" checked>
+                            Auto-scroll
+                        </label>
+                        <span id="debug-status" style="padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; background: #fee; color: #c53030;">DISABLED</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                        <div style="background: var(--bg-primary); padding: 1rem; border-radius: 12px;">
+                            <div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.5rem;">Total Messages</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="debug-total-messages">0</div>
+                        </div>
+                        <div style="background: var(--bg-primary); padding: 1rem; border-radius: 12px;">
+                            <div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.5rem;">Active Sessions</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="debug-active-sessions">0</div>
+                        </div>
+                        <div style="background: var(--bg-primary); padding: 1rem; border-radius: 12px;">
+                            <div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.5rem;">Avg Response Time</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="debug-avg-response">0ms</div>
+                        </div>
+                        <div style="background: var(--bg-primary); padding: 1rem; border-radius: 12px;">
+                            <div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.5rem;">Errors</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #c53030;" id="debug-error-count">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="logs-container" id="debug-messages-container" style="height: 500px; font-family: 'Space Mono', monospace; font-size: 0.8rem;"></div>
                 </div>
 
                 <div class="tab-content" id="server-logs-tab">

@@ -7,6 +7,9 @@ import { HttpClientTransport } from './http-client-transport.js';
 import { MCPServerConfig, ConnectedServer } from './types.js';
 import type { Tool, Resource, Prompt } from '@modelcontextprotocol/sdk/types.js';
 import { LogManager } from './log-manager.js';
+import { DebugManager } from './debug-manager.js';
+import { FirehoseManager } from './firehose-manager.js';
+import { DebugTransportWrapper } from './debug-transport-wrapper.js';
 // Polyfill for EventSource in Node.js
 import { EventSource } from 'eventsource';
 (global as any).EventSource = EventSource;
@@ -15,9 +18,13 @@ export class ServerManager {
   private servers: Map<string, ConnectedServer> = new Map();
   private shutdownHandlers: Set<() => Promise<void>> = new Set();
   private logManager: LogManager;
+  private debugManager: DebugManager;
+  private firehoseManager: FirehoseManager;
 
-  constructor(logManager: LogManager) {
+  constructor(logManager: LogManager, debugManager: DebugManager, firehoseManager: FirehoseManager) {
     this.logManager = logManager;
+    this.debugManager = debugManager;
+    this.firehoseManager = firehoseManager;
   }
 
   registerDisabledServer(config: MCPServerConfig): void {
@@ -92,6 +99,19 @@ export class ServerManager {
 
         default:
           throw new Error(`Unsupported transport: ${config.transport}`);
+      }
+
+      // Wrap transport with debug interceptor if debugging is enabled
+      if (this.debugManager.isDebugEnabled()) {
+        const wrapper = new DebugTransportWrapper(
+          transport,
+          this.debugManager,
+          config.id,
+          config.name,
+          config.transport
+        );
+        transport = wrapper.getTransport();
+        this.debugManager.startSession(config.id, config.name);
       }
 
       // Add timeout for connection
@@ -230,10 +250,23 @@ export class ServerManager {
   async callTool(serverId: string, toolName: string, args: any): Promise<any> {
     const server = this.servers.get(serverId);
     if (!server || server.status !== 'connected') {
-      throw new Error(`Server ${serverId} not connected`);
+      const error = `Server ${serverId} not connected`;
+      this.firehoseManager.captureMCPError(serverId, serverId, toolName, error);
+      throw new Error(error);
     }
 
-    return await server.client.callTool(toolName, args);
+    const startTime = Date.now();
+    this.firehoseManager.captureMCPRequest(serverId, server.config.name, toolName, args);
+    
+    try {
+      const result = await server.client.callTool(toolName, args);
+      const duration = Date.now() - startTime;
+      this.firehoseManager.captureMCPResponse(serverId, server.config.name, toolName, result, duration);
+      return result;
+    } catch (error) {
+      this.firehoseManager.captureMCPError(serverId, server.config.name, toolName, error);
+      throw error;
+    }
   }
 
   async readResource(serverId: string, uri: string): Promise<any> {

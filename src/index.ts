@@ -2,6 +2,8 @@ import { ProxyServer } from './proxy-server.js';
 import { WebServer } from './web-server.js';
 import { StreamableServer } from './streamable-server.js';
 import { LogManager } from './log-manager.js';
+import { DebugManager } from './debug-manager.js';
+import { FirehoseManager } from './firehose-manager.js';
 import { ProxyConfig } from './types.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -31,18 +33,22 @@ async function main() {
     const configPath = process.env.CLAUDEFORGE_CONFIG || path.join(__dirname, '..', 'config.json');
     const config = await loadConfig();
     const logManager = new LogManager();
+    const debugManager = new DebugManager();
+    const firehoseManager = new FirehoseManager();
     
     console.log('Starting ClaudeForge Server...');
     console.log(`Web interface will be available at http://localhost:${config.webPort}`);
     console.log(`Streamable HTTP endpoint will be available at http://localhost:${config.port}`);
     
-    const proxyServer = new ProxyServer(config, logManager, configPath);
+    const proxyServer = new ProxyServer(config, logManager, debugManager, firehoseManager, configPath);
     
     const webServer = new WebServer(
       config.webPort,
       proxyServer.getServerManager(),
       proxyServer.getPermissionManager(),
       logManager,
+      debugManager,
+      firehoseManager,
       proxyServer
     );
     

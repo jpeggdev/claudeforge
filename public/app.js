@@ -9,6 +9,37 @@ class MCPProxyManager {
         this.systemLogs = [];
         this.maxLogs = 500;
         
+        // Debug features
+        this.debugEnabled = false;
+        this.debugMessages = [];
+        this.debugStats = {};
+        this.debugEventSource = null;
+        
+        // Firehose features
+        this.firehoseEnabled = true;
+        this.firehosePaused = false;
+        this.firehoseFilter = '';
+        this.firehoseTextFilter = '';
+        this.firehoseEventCount = 0;
+        this.firehoseEventRate = 0;
+        this.firehoseBuffer = [];
+        this.firehoseFullBuffer = []; // Keep all events for filtering
+        this.maxFirehoseLines = 1000;
+        this.firehoseAutoScroll = true;
+        this.firehoseUserScrolled = false;
+        this.firehoseNoiseReduction = true;
+        this.firehoseExclusions = {
+            'ws-out': true,
+            'ws-in': true,
+            'firehose': true,
+            'stats': true,
+            'heartbeat': true,
+            'static': true,
+            'api-status': false,
+            'options': false
+        };
+        this.firehoseCustomExclusions = [];
+        
         this.init();
     }
 
@@ -16,8 +47,10 @@ class MCPProxyManager {
         await this.loadServers();
         await this.loadSessions();
         await this.loadLogs();
+        await this.loadDebugStatus();
         this.setupWebSocket();
         this.setupEventListeners();
+        this.setupDebugStream();
         this.render();
     }
 
@@ -73,6 +106,10 @@ class MCPProxyManager {
                 this.updateServerStatuses(data.servers);
             } else if (data.type === 'log') {
                 this.addLog(data.log);
+            } else if (data.type === 'firehose') {
+                this.handleFirehoseEvent(data.event);
+            } else if (data.type === 'firehose-stats') {
+                this.updateFirehoseStats(data.stats);
             }
         };
 
@@ -126,6 +163,20 @@ class MCPProxyManager {
 
         document.getElementById('system-log-level-filter').addEventListener('change', () => {
             this.renderSystemLogs();
+        });
+        
+        // Add event listeners for firehose exclusion checkboxes
+        const exclusionCheckboxes = [
+            'exclude-ws-out', 'exclude-ws-in', 'exclude-firehose', 
+            'exclude-stats', 'exclude-heartbeat', 'exclude-static',
+            'exclude-api-status', 'exclude-options'
+        ];
+        
+        exclusionCheckboxes.forEach(id => {
+            const checkbox = document.getElementById(id);
+            if (checkbox) {
+                checkbox.addEventListener('change', () => this.updateFirehoseExclusions());
+            }
         });
     }
 
@@ -665,6 +716,435 @@ class MCPProxyManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Debug methods
+    async loadDebugStatus() {
+        try {
+            const response = await fetch('/api/debug/status');
+            const data = await response.json();
+            this.debugEnabled = data.enabled;
+            this.debugStats = data.stats || {};
+            this.updateDebugUI();
+        } catch (error) {
+            console.error('Failed to load debug status:', error);
+        }
+    }
+
+    async toggleDebug() {
+        try {
+            const endpoint = this.debugEnabled ? '/api/debug/disable' : '/api/debug/enable';
+            const response = await fetch(endpoint, { method: 'POST' });
+            const data = await response.json();
+            this.debugEnabled = data.enabled;
+            this.updateDebugUI();
+            
+            if (this.debugEnabled) {
+                await this.loadDebugMessages();
+            }
+        } catch (error) {
+            console.error('Failed to toggle debug:', error);
+        }
+    }
+
+    async loadDebugMessages() {
+        try {
+            const serverFilter = document.getElementById('debug-server-filter').value;
+            const url = serverFilter ? `/api/debug/messages?serverId=${serverFilter}` : '/api/debug/messages';
+            const response = await fetch(url);
+            this.debugMessages = await response.json();
+            this.renderDebugMessages();
+        } catch (error) {
+            console.error('Failed to load debug messages:', error);
+        }
+    }
+
+    async clearDebugMessages() {
+        try {
+            const serverFilter = document.getElementById('debug-server-filter').value;
+            const url = serverFilter ? `/api/debug/messages?serverId=${serverFilter}` : '/api/debug/messages';
+            await fetch(url, { method: 'DELETE' });
+            this.debugMessages = [];
+            this.renderDebugMessages();
+        } catch (error) {
+            console.error('Failed to clear debug messages:', error);
+        }
+    }
+
+    async exportDebugData() {
+        try {
+            const response = await fetch('/api/debug/export');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mcp-debug-${Date.now()}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to export debug data:', error);
+        }
+    }
+
+    setupDebugStream() {
+        if (this.debugEventSource) {
+            this.debugEventSource.close();
+        }
+
+        this.debugEventSource = new EventSource('/api/debug/stream');
+        
+        this.debugEventSource.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.debugMessages.push(message);
+            
+            // Limit messages
+            if (this.debugMessages.length > this.maxLogs) {
+                this.debugMessages.shift();
+            }
+            
+            this.renderDebugMessages();
+            this.updateDebugStats();
+        };
+
+        this.debugEventSource.onerror = (error) => {
+            console.error('Debug stream error:', error);
+        };
+    }
+
+    updateDebugUI() {
+        const toggleBtn = document.getElementById('debug-toggle-btn');
+        const statusSpan = document.getElementById('debug-status');
+        
+        if (this.debugEnabled) {
+            toggleBtn.textContent = 'Disable Debugging';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-secondary');
+            statusSpan.textContent = 'ENABLED';
+            statusSpan.style.background = '#c6f6d5';
+            statusSpan.style.color = '#22543d';
+        } else {
+            toggleBtn.textContent = 'Enable Debugging';
+            toggleBtn.classList.remove('btn-secondary');
+            toggleBtn.classList.add('btn-primary');
+            statusSpan.textContent = 'DISABLED';
+            statusSpan.style.background = '#fee';
+            statusSpan.style.color = '#c53030';
+        }
+        
+        this.updateDebugStats();
+    }
+
+    updateDebugStats() {
+        if (this.debugStats) {
+            document.getElementById('debug-total-messages').textContent = this.debugStats.totalMessages || 0;
+            document.getElementById('debug-active-sessions').textContent = this.debugStats.activeSessions || 0;
+        }
+        
+        // Calculate stats from messages
+        let totalErrors = 0;
+        let totalResponseTime = 0;
+        let responseCount = 0;
+        
+        this.debugMessages.forEach(msg => {
+            if (msg.messageType === 'error') totalErrors++;
+            if (msg.duration) {
+                totalResponseTime += msg.duration;
+                responseCount++;
+            }
+        });
+        
+        document.getElementById('debug-error-count').textContent = totalErrors;
+        const avgResponse = responseCount > 0 ? Math.round(totalResponseTime / responseCount) : 0;
+        document.getElementById('debug-avg-response').textContent = `${avgResponse}ms`;
+    }
+
+    renderDebugMessages() {
+        const container = document.getElementById('debug-messages-container');
+        const autoScroll = document.getElementById('debug-auto-scroll').checked;
+        const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 10;
+        
+        container.innerHTML = this.debugMessages.map(msg => {
+            const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+            const directionIcon = msg.direction === 'client-to-server' ? '→' : '←';
+            const typeColor = {
+                'request': '#3182ce',
+                'response': '#38a169',
+                'notification': '#d69e2e',
+                'error': '#e53e3e'
+            }[msg.messageType] || '#718096';
+            
+            let content = `
+                <div class="log-entry" style="border-left: 3px solid ${typeColor};">
+                    <div style="display: flex; gap: 1rem; align-items: start; width: 100%;">
+                        <span class="log-timestamp">${timestamp}</span>
+                        <span style="color: ${typeColor}; font-weight: 600;">${directionIcon}</span>
+                        <div style="flex: 1;">
+                            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.25rem;">
+                                <span style="font-weight: 600; color: var(--text-primary);">${msg.serverName}</span>
+                                <span style="padding: 0.125rem 0.5rem; background: ${typeColor}22; color: ${typeColor}; border-radius: 4px; font-size: 0.7rem;">
+                                    ${msg.messageType.toUpperCase()}
+                                </span>
+                                ${msg.method ? `<span style="color: var(--text-secondary);">${msg.method}</span>` : ''}
+                                ${msg.duration ? `<span style="color: var(--text-light); font-size: 0.75rem;">${msg.duration}ms</span>` : ''}
+                            </div>
+                            <pre style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; overflow-x: auto;">${JSON.stringify(msg.data, null, 2)}</pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return content;
+        }).join('');
+        
+        if (autoScroll && wasAtBottom) {
+            container.scrollTop = container.scrollHeight;
+        }
+    }
+
+    // Firehose methods
+    handleFirehoseEvent(event) {
+        if (this.firehosePaused) return;
+        
+        // Format the event for display
+        const timestamp = new Date(event.timestamp).toLocaleTimeString() + '.' + 
+                         new Date(event.timestamp).getMilliseconds().toString().padStart(3, '0');
+        
+        let line = `[${timestamp}] ${event.category.toUpperCase().padEnd(10)} ${event.type.padEnd(15)} ${event.source}`;
+        
+        if (event.data) {
+            if (typeof event.data === 'object') {
+                if (event.data.method) line += ` ${event.data.method}`;
+                if (event.data.status) line += ` [${event.data.status}]`;
+                if (event.data.message) line += ` ${event.data.message}`;
+                if (event.data.error) line += ` ERROR: ${event.data.error}`;
+            } else {
+                line += ` ${event.data}`;
+            }
+        }
+        
+        if (event.metadata) {
+            if (event.metadata.duration) line += ` (${event.metadata.duration}ms)`;
+            if (event.metadata.size) line += ` ${event.metadata.size}b`;
+        }
+        
+        // Store the formatted line with the event for filtering
+        const eventWithLine = { event, line };
+        
+        // Add to full buffer
+        this.firehoseFullBuffer.push(eventWithLine);
+        if (this.firehoseFullBuffer.length > this.maxFirehoseLines) {
+            this.firehoseFullBuffer.shift();
+        }
+        
+        // Apply filters and update display
+        this.updateFirehoseDisplay();
+        
+        this.firehoseEventCount++;
+    }
+    
+    updateFirehoseDisplay() {
+        // Filter events based on category and text filters
+        let filteredEvents = this.firehoseFullBuffer;
+        
+        // Apply noise reduction filters if enabled
+        if (this.firehoseNoiseReduction) {
+            filteredEvents = filteredEvents.filter(item => {
+                const event = item.event;
+                const line = item.line.toLowerCase();
+                
+                // Check WebSocket messages
+                if (this.firehoseExclusions['ws-out'] && event.category === 'websocket' && event.type === 'message-out') return false;
+                if (this.firehoseExclusions['ws-in'] && event.category === 'websocket' && event.type === 'message-in') return false;
+                
+                // Check firehose events
+                if (this.firehoseExclusions['firehose'] && line.includes('firehose')) return false;
+                
+                // Check stats events
+                if (this.firehoseExclusions['stats'] && (event.type === 'stats' || line.includes('stats'))) return false;
+                
+                // Check heartbeat events
+                if (this.firehoseExclusions['heartbeat'] && line.includes('heartbeat')) return false;
+                
+                // Check static file requests
+                if (this.firehoseExclusions['static'] && event.category === 'http') {
+                    if (event.data && event.data.path && 
+                        (event.data.path.endsWith('.js') || event.data.path.endsWith('.css') || 
+                         event.data.path.endsWith('.html') || event.data.path === '/app.js')) {
+                        return false;
+                    }
+                }
+                
+                // Check API status calls
+                if (this.firehoseExclusions['api-status'] && line.includes('/api/servers')) return false;
+                
+                // Check OPTIONS requests
+                if (this.firehoseExclusions['options'] && event.data && event.data.method === 'OPTIONS') return false;
+                
+                // Check custom exclusions
+                for (const pattern of this.firehoseCustomExclusions) {
+                    if (line.includes(pattern.toLowerCase())) return false;
+                }
+                
+                return true;
+            });
+        }
+        
+        // Apply category filter
+        if (this.firehoseFilter) {
+            filteredEvents = filteredEvents.filter(item => 
+                item.event.category === this.firehoseFilter
+            );
+        }
+        
+        // Apply text filter
+        if (this.firehoseTextFilter) {
+            const searchText = this.firehoseTextFilter.toLowerCase();
+            filteredEvents = filteredEvents.filter(item => 
+                item.line.toLowerCase().includes(searchText)
+            );
+        }
+        
+        // Update buffer with filtered lines
+        this.firehoseBuffer = filteredEvents.map(item => item.line);
+        
+        // Update textarea
+        const textarea = document.getElementById('firehose-stream');
+        if (textarea) {
+            const wasAtBottom = textarea.scrollHeight - textarea.scrollTop <= textarea.clientHeight + 10;
+            
+            textarea.value = this.firehoseBuffer.join('\n');
+            
+            // Auto-scroll only if enabled and user hasn't manually scrolled
+            if (this.firehoseAutoScroll && !this.firehoseUserScrolled && wasAtBottom) {
+                textarea.scrollTop = textarea.scrollHeight;
+            }
+        }
+    }
+    
+    handleFirehoseScroll() {
+        const textarea = document.getElementById('firehose-stream');
+        const checkbox = document.getElementById('firehose-auto-scroll');
+        
+        if (!textarea || !checkbox) return;
+        
+        // Check if user scrolled away from bottom
+        const isAtBottom = textarea.scrollHeight - textarea.scrollTop <= textarea.clientHeight + 10;
+        
+        if (!isAtBottom) {
+            // User scrolled up - disable auto-scroll
+            this.firehoseUserScrolled = true;
+            this.firehoseAutoScroll = false;
+            checkbox.checked = false;
+        } else if (this.firehoseUserScrolled) {
+            // User scrolled back to bottom - re-enable auto-scroll
+            this.firehoseUserScrolled = false;
+            this.firehoseAutoScroll = true;
+            checkbox.checked = true;
+        }
+    }
+    
+    updateFirehoseAutoScroll() {
+        const checkbox = document.getElementById('firehose-auto-scroll');
+        this.firehoseAutoScroll = checkbox.checked;
+        this.firehoseUserScrolled = !checkbox.checked;
+        
+        // If auto-scroll was just enabled, scroll to bottom
+        if (this.firehoseAutoScroll) {
+            const textarea = document.getElementById('firehose-stream');
+            if (textarea) {
+                textarea.scrollTop = textarea.scrollHeight;
+            }
+        }
+    }
+    
+    updateFirehoseTextFilter() {
+        const input = document.getElementById('firehose-text-filter');
+        this.firehoseTextFilter = input.value;
+        this.updateFirehoseDisplay();
+    }
+    
+    updateFirehoseStats(stats) {
+        document.getElementById('firehose-event-count').textContent = stats.totalEvents || 0;
+        document.getElementById('firehose-event-rate').textContent = `${stats.eventsPerSecond || 0}/s`;
+        this.firehoseEventRate = stats.eventsPerSecond || 0;
+    }
+    
+    toggleFirehose() {
+        this.firehosePaused = !this.firehosePaused;
+        const btn = document.getElementById('firehose-toggle-btn');
+        const icon = document.getElementById('firehose-toggle-icon');
+        const text = document.getElementById('firehose-toggle-text');
+        const status = document.getElementById('firehose-status');
+        
+        if (this.firehosePaused) {
+            icon.textContent = '▶️';
+            text.textContent = 'Resume';
+            status.textContent = 'PAUSED';
+            status.style.background = '#fee';
+            status.style.color = '#c53030';
+        } else {
+            icon.textContent = '⏸️';
+            text.textContent = 'Pause';
+            status.textContent = 'STREAMING';
+            status.style.background = '#c6f6d5';
+            status.style.color = '#22543d';
+        }
+    }
+    
+    clearFirehose() {
+        this.firehoseBuffer = [];
+        this.firehoseFullBuffer = [];
+        this.firehoseEventCount = 0;
+        const textarea = document.getElementById('firehose-stream');
+        if (textarea) {
+            textarea.value = '';
+        }
+        document.getElementById('firehose-event-count').textContent = '0';
+    }
+    
+    updateFirehoseFilter() {
+        const filter = document.getElementById('firehose-filter');
+        this.firehoseFilter = filter.value;
+        // Re-apply filters to existing buffer
+        this.updateFirehoseDisplay();
+    }
+    
+    toggleFirehoseNoiseFilter() {
+        this.firehoseNoiseReduction = !this.firehoseNoiseReduction;
+        const btn = document.getElementById('firehose-noise-btn');
+        const exclusionsDiv = document.getElementById('firehose-exclusions');
+        
+        if (this.firehoseNoiseReduction) {
+            btn.innerHTML = '<span id="firehose-noise-icon">🔇</span> Reduce Noise';
+            exclusionsDiv.style.display = 'none';
+        } else {
+            btn.innerHTML = '<span id="firehose-noise-icon">🔊</span> Show All';
+            exclusionsDiv.style.display = 'block';
+        }
+        
+        // Re-apply filters
+        this.updateFirehoseDisplay();
+    }
+    
+    updateFirehoseExclusions() {
+        // Update exclusion settings from checkboxes
+        this.firehoseExclusions['ws-out'] = document.getElementById('exclude-ws-out').checked;
+        this.firehoseExclusions['ws-in'] = document.getElementById('exclude-ws-in').checked;
+        this.firehoseExclusions['firehose'] = document.getElementById('exclude-firehose').checked;
+        this.firehoseExclusions['stats'] = document.getElementById('exclude-stats').checked;
+        this.firehoseExclusions['heartbeat'] = document.getElementById('exclude-heartbeat').checked;
+        this.firehoseExclusions['static'] = document.getElementById('exclude-static').checked;
+        this.firehoseExclusions['api-status'] = document.getElementById('exclude-api-status').checked;
+        this.firehoseExclusions['options'] = document.getElementById('exclude-options').checked;
+        
+        // Parse custom exclusions
+        const customInput = document.getElementById('firehose-custom-exclude').value;
+        this.firehoseCustomExclusions = customInput
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+        
+        // Re-apply filters
+        this.updateFirehoseDisplay();
     }
 }
 

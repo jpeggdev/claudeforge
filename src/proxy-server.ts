@@ -14,6 +14,8 @@ import {
 import { ServerManager } from './server-manager.js';
 import { PermissionManager } from './permission-manager.js';
 import { LogManager } from './log-manager.js';
+import { DebugManager } from './debug-manager.js';
+import { FirehoseManager } from './firehose-manager.js';
 import { ProxyConfig } from './types.js';
 import fs from 'fs/promises';
 import { watch } from 'fs';
@@ -24,16 +26,20 @@ export class ProxyServer {
   private serverManager: ServerManager;
   private permissionManager: PermissionManager;
   private logManager: LogManager;
+  private debugManager: DebugManager;
+  private firehoseManager: FirehoseManager;
   private config: ProxyConfig;
   private currentSessionId: string | null = null;
   private configPath: string;
   private configWatcher: any;
 
-  constructor(config: ProxyConfig, logManager: LogManager, configPath?: string) {
+  constructor(config: ProxyConfig, logManager: LogManager, debugManager: DebugManager, firehoseManager: FirehoseManager, configPath?: string) {
     this.config = config;
     this.logManager = logManager;
+    this.debugManager = debugManager;
+    this.firehoseManager = firehoseManager;
     this.configPath = configPath || path.join(process.cwd(), 'config.json');
-    this.serverManager = new ServerManager(logManager);
+    this.serverManager = new ServerManager(logManager, debugManager, firehoseManager);
     this.permissionManager = new PermissionManager();
     this.permissionManager.setDefaultPolicy(config.defaultPermissions === 'allow');
 

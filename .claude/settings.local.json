@@ -6,7 +6,10 @@
       "Bash(ls:*)",
       "Bash(pkill:*)",
       "Bash(kill:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(systemctl:*)",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }
