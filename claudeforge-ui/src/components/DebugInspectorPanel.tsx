@@ -143,7 +143,7 @@ export function DebugInspectorPanel() {
           <Badge variant="default">Requests: {stats.requests}</Badge>
           <Badge variant="secondary">Responses: {stats.responses}</Badge>
           <Badge variant="outline">Notifications: {stats.notifications}</Badge>
-          <Badge variant="outline">Avg Time: {stats.avgResponseTime.toFixed(2)}ms</Badge>
+          <Badge variant="outline">Avg Time: {(stats.avgResponseTime || 0).toFixed(2)}ms</Badge>
         </div>
       </div>
 

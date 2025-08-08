@@ -87,49 +87,45 @@ function App() {
         <main className="flex-1 flex gap-4 p-4 overflow-hidden">
           {/* MCP Server Panel */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <Tabs defaultValue="tools" className="flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="tools" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-4 shrink-0">
                 <TabsTrigger value="tools">Tools</TabsTrigger>
                 <TabsTrigger value="resources">Resources</TabsTrigger>
                 <TabsTrigger value="prompts">Prompts</TabsTrigger>
                 <TabsTrigger value="logs">Server Logs</TabsTrigger>
               </TabsList>
-              <div className="flex-1 overflow-hidden mt-4">
-                <TabsContent value="tools" className="h-full m-0">
-                  <ToolsPanel server={selectedServerData} />
-                </TabsContent>
-                <TabsContent value="resources" className="h-full m-0">
-                  <ResourcesPanel server={selectedServerData} />
-                </TabsContent>
-                <TabsContent value="prompts" className="h-full m-0">
-                  <PromptsPanel server={selectedServerData} />
-                </TabsContent>
-                <TabsContent value="logs" className="h-full m-0">
-                  <ServerLogsPanel server={selectedServerData} />
-                </TabsContent>
-              </div>
+              <TabsContent value="tools" className="flex-1 overflow-hidden mt-4">
+                <ToolsPanel server={selectedServerData} />
+              </TabsContent>
+              <TabsContent value="resources" className="flex-1 overflow-hidden mt-4">
+                <ResourcesPanel server={selectedServerData} />
+              </TabsContent>
+              <TabsContent value="prompts" className="flex-1 overflow-hidden mt-4">
+                <PromptsPanel server={selectedServerData} />
+              </TabsContent>
+              <TabsContent value="logs" className="flex-1 overflow-hidden mt-4">
+                <ServerLogsPanel server={selectedServerData} />
+              </TabsContent>
             </Tabs>
           </div>
 
           {/* System Panel */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <Tabs defaultValue="firehose" className="flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="firehose" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-3 shrink-0">
                 <TabsTrigger value="firehose">Firehose</TabsTrigger>
                 <TabsTrigger value="debug">Debug Inspector</TabsTrigger>
                 <TabsTrigger value="system-logs">System Logs</TabsTrigger>
               </TabsList>
-              <div className="flex-1 overflow-hidden mt-4">
-                <TabsContent value="firehose" className="h-full m-0">
-                  <FirehosePanel />
-                </TabsContent>
-                <TabsContent value="debug" className="h-full m-0">
-                  <DebugInspectorPanel />
-                </TabsContent>
-                <TabsContent value="system-logs" className="h-full m-0">
-                  <SystemLogsPanel />
-                </TabsContent>
-              </div>
+              <TabsContent value="firehose" className="flex-1 overflow-hidden mt-4">
+                <FirehosePanel />
+              </TabsContent>
+              <TabsContent value="debug" className="flex-1 overflow-hidden mt-4">
+                <DebugInspectorPanel />
+              </TabsContent>
+              <TabsContent value="system-logs" className="flex-1 overflow-hidden mt-4">
+                <SystemLogsPanel />
+              </TabsContent>
             </Tabs>
           </div>
         </main>
