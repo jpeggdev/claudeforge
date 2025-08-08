@@ -58,6 +58,15 @@ async function main() {
       proxyServer.getPermissionManager(),
       logManager
     );
+    
+    // Start the Streamable server and handle errors
+    try {
+      await streamableServer.start();
+    } catch (error) {
+      logManager.error('Failed to start Streamable HTTP server', undefined, undefined, error);
+      console.error('Failed to start Streamable HTTP server on port', config.port, error);
+      process.exit(1);
+    }
 
     const shutdown = async (signal: string) => {
       logManager.info(`Received ${signal}, shutting down gracefully`);
@@ -88,6 +97,28 @@ async function main() {
     });
 
     await proxyServer.start();
+    
+    // Verify both servers are actually listening
+    const verifyServers = async (): Promise<boolean> => {
+      try {
+        const [webHealth, proxyHealth] = await Promise.all([
+          fetch(`http://localhost:${config.webPort}/api/health`).then(r => r.ok).catch(() => false),
+          fetch(`http://localhost:${config.port}/health`).then(r => r.ok).catch(() => false)
+        ]);
+        return webHealth && proxyHealth;
+      } catch {
+        return false;
+      }
+    };
+    
+    // Give servers a moment to fully initialize and verify they're responding
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const serversReady = await verifyServers();
+    
+    if (!serversReady) {
+      console.error('Warning: One or more servers may not be responding correctly');
+      logManager.warning('Server health check failed after startup');
+    }
     
     console.log('ClaudeForge Server is running');
     console.log(`Web interface: http://localhost:${config.webPort}`);

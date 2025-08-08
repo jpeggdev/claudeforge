@@ -334,6 +334,10 @@ export class ProxyServer {
   getPermissionManager(): PermissionManager {
     return this.permissionManager;
   }
+  
+  getConfig(): ProxyConfig {
+    return this.config;
+  }
 
   setCurrentSession(sessionId: string): void {
     this.currentSessionId = sessionId;

@@ -94,6 +94,30 @@ export class WebServer {
     this.app.get('/mcp', (req, res) => this.sseMcpHandler.handleSSE(req, res));
     this.app.post('/mcp', (req, res) => this.sseMcpHandler.handleRequest(req, res));
     
+    // Health check endpoint
+    this.app.get('/api/health', async (req, res) => {
+      try {
+        const proxyPort = this.proxyServer?.getConfig().port || 3000;
+        const proxyHealth = await fetch(`http://localhost:${proxyPort}/health`)
+          .then(r => r.ok)
+          .catch(() => false);
+        
+        res.json({
+          status: 'ok',
+          webServer: true,
+          proxyServer: proxyHealth,
+          proxyPort,
+          webPort: this.port,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+    
     // Admin API endpoints
     this.app.get('/api/servers', (req, res) => {
       const servers = this.serverManager.getAllServers();

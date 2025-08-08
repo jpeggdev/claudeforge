@@ -13,9 +13,10 @@ import { StreamableHttpHandler } from './streamable-http-handler.js';
  */
 export class StreamableServer {
   private app: Express;
-  private httpServer: HTTPServer;
+  private httpServer: HTTPServer | null = null;
   private streamableHttpHandler: StreamableHttpHandler;
   private port: number;
+  private logManager: LogManager;
 
   constructor(
     port: number,
@@ -24,15 +25,39 @@ export class StreamableServer {
     logManager: LogManager
   ) {
     this.port = port;
+    this.logManager = logManager;
     this.streamableHttpHandler = new StreamableHttpHandler(serverManager, permissionManager, logManager);
     this.app = express();
     
     this.setupMiddleware();
     this.setupRoutes();
-    
-    // Start the server
-    this.httpServer = this.app.listen(port);
-    logManager.info(`Streamable HTTP server started on port ${port}`, 'streamable-server');
+  }
+
+  async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.httpServer = this.app.listen(this.port);
+        
+        this.httpServer.on('listening', () => {
+          this.logManager.info(`Streamable HTTP server started on port ${this.port}`, 'streamable-server');
+          resolve();
+        });
+        
+        this.httpServer.on('error', (error: any) => {
+          if (error.code === 'EADDRINUSE') {
+            this.logManager.error(`Port ${this.port} is already in use`, 'streamable-server');
+          } else if (error.code === 'EACCES') {
+            this.logManager.error(`Permission denied to bind to port ${this.port}`, 'streamable-server');
+          } else {
+            this.logManager.error(`Failed to start server on port ${this.port}`, 'streamable-server', undefined, error);
+          }
+          reject(error);
+        });
+      } catch (error) {
+        this.logManager.error('Failed to create HTTP server', 'streamable-server', undefined, error);
+        reject(error);
+      }
+    });
   }
 
   private setupMiddleware(): void {
@@ -81,9 +106,22 @@ export class StreamableServer {
 
   async stop(): Promise<void> {
     return new Promise((resolve) => {
-      this.httpServer.close(() => {
+      if (this.httpServer) {
+        this.httpServer.close(() => {
+          this.logManager.info('Streamable HTTP server stopped', 'streamable-server');
+          resolve();
+        });
+      } else {
         resolve();
-      });
+      }
     });
+  }
+  
+  isListening(): boolean {
+    return this.httpServer !== null && this.httpServer.listening;
+  }
+  
+  getPort(): number {
+    return this.port;
   }
 }
