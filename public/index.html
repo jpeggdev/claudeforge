@@ -786,17 +786,17 @@
                         </div>
                     </div>
                     
-                    <div id="firehose-exclusions" style="display: none; background: var(--bg-primary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <div id="firehose-exclusions" style="display: block; background: var(--bg-primary); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                         <div style="font-weight: 600; margin-bottom: 0.5rem;">Exclude Message Types:</div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
-                            <label><input type="checkbox" id="exclude-ws-out" checked> WebSocket message-out</label>
-                            <label><input type="checkbox" id="exclude-ws-in" checked> WebSocket message-in</label>
-                            <label><input type="checkbox" id="exclude-firehose" checked> Firehose events</label>
-                            <label><input type="checkbox" id="exclude-stats" checked> Stats updates</label>
-                            <label><input type="checkbox" id="exclude-heartbeat" checked> Heartbeats</label>
-                            <label><input type="checkbox" id="exclude-static" checked> Static files (JS/CSS)</label>
-                            <label><input type="checkbox" id="exclude-api-status"> API status calls</label>
-                            <label><input type="checkbox" id="exclude-options"> OPTIONS requests</label>
+                            <label><input type="checkbox" id="exclude-ws-out" checked onchange="app.updateFirehoseExclusions()"> WebSocket message-out</label>
+                            <label><input type="checkbox" id="exclude-ws-in" checked onchange="app.updateFirehoseExclusions()"> WebSocket message-in</label>
+                            <label><input type="checkbox" id="exclude-firehose" checked onchange="app.updateFirehoseExclusions()"> Firehose events</label>
+                            <label><input type="checkbox" id="exclude-stats" checked onchange="app.updateFirehoseExclusions()"> Stats updates</label>
+                            <label><input type="checkbox" id="exclude-heartbeat" checked onchange="app.updateFirehoseExclusions()"> Heartbeats</label>
+                            <label><input type="checkbox" id="exclude-static" checked onchange="app.updateFirehoseExclusions()"> Static files (JS/CSS)</label>
+                            <label><input type="checkbox" id="exclude-api-status" onchange="app.updateFirehoseExclusions()"> API status calls</label>
+                            <label><input type="checkbox" id="exclude-options" onchange="app.updateFirehoseExclusions()"> OPTIONS requests</label>
                         </div>
                         <div style="margin-top: 0.5rem;">
                             <input type="text" class="search-input" id="firehose-custom-exclude" placeholder="Custom exclusion patterns (comma-separated)" style="width: 100%;" oninput="app.updateFirehoseExclusions()">

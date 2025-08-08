@@ -9,7 +9,8 @@
       "Bash(curl:*)",
       "Bash(systemctl:*)",
       "Bash(npm search:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "WebFetch(domain:www.heroui.com)"
     ],
     "deny": []
   }

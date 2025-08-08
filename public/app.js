@@ -51,7 +51,26 @@ class MCPProxyManager {
         this.setupWebSocket();
         this.setupEventListeners();
         this.setupDebugStream();
+        this.initializeFirehoseUI();
         this.render();
+    }
+    
+    initializeFirehoseUI() {
+        // Set initial state of noise reduction button
+        const btn = document.getElementById('firehose-noise-btn');
+        const exclusionsDiv = document.getElementById('firehose-exclusions');
+        
+        if (btn) {
+            if (this.firehoseNoiseReduction) {
+                btn.innerHTML = '<span id="firehose-noise-icon">🔇</span> Reduce Noise';
+                btn.style.background = 'var(--bg-success)';
+                if (exclusionsDiv) exclusionsDiv.style.display = 'block';
+            } else {
+                btn.innerHTML = '<span id="firehose-noise-icon">🔊</span> Show All';
+                btn.style.background = '';
+                if (exclusionsDiv) exclusionsDiv.style.display = 'none';
+            }
+        }
     }
 
     async loadServers() {
@@ -951,37 +970,58 @@ class MCPProxyManager {
                 const event = item.event;
                 const line = item.line.toLowerCase();
                 
-                // Check WebSocket messages
-                if (this.firehoseExclusions['ws-out'] && event.category === 'websocket' && event.type === 'message-out') return false;
-                if (this.firehoseExclusions['ws-in'] && event.category === 'websocket' && event.type === 'message-in') return false;
+                // Debug log to see what we're filtering
+                // console.log('Filtering event:', event.category, event.type, this.firehoseExclusions);
                 
-                // Check firehose events
-                if (this.firehoseExclusions['firehose'] && line.includes('firehose')) return false;
+                // Check WebSocket messages
+                if (this.firehoseExclusions['ws-out'] && event.category === 'websocket' && event.type === 'message-out') {
+                    return false;
+                }
+                if (this.firehoseExclusions['ws-in'] && event.category === 'websocket' && event.type === 'message-in') {
+                    return false;
+                }
+                
+                // Check firehose events (events about the firehose itself)
+                if (this.firehoseExclusions['firehose'] && (event.type === 'firehose' || line.includes('/api/firehose'))) {
+                    return false;
+                }
                 
                 // Check stats events
-                if (this.firehoseExclusions['stats'] && (event.type === 'stats' || line.includes('stats'))) return false;
+                if (this.firehoseExclusions['stats'] && (event.type === 'stats' || line.includes('stats') || line.includes('firehose-stats'))) {
+                    return false;
+                }
                 
                 // Check heartbeat events
-                if (this.firehoseExclusions['heartbeat'] && line.includes('heartbeat')) return false;
+                if (this.firehoseExclusions['heartbeat'] && (line.includes('heartbeat') || line.includes(':heartbeat'))) {
+                    return false;
+                }
                 
                 // Check static file requests
                 if (this.firehoseExclusions['static'] && event.category === 'http') {
                     if (event.data && event.data.path && 
                         (event.data.path.endsWith('.js') || event.data.path.endsWith('.css') || 
-                         event.data.path.endsWith('.html') || event.data.path === '/app.js')) {
+                         event.data.path.endsWith('.html') || event.data.path === '/app.js' ||
+                         event.data.path === '/' || event.data.path === '/favicon.ico')) {
                         return false;
                     }
                 }
                 
                 // Check API status calls
-                if (this.firehoseExclusions['api-status'] && line.includes('/api/servers')) return false;
+                if (this.firehoseExclusions['api-status'] && 
+                    (line.includes('/api/servers') || line.includes('/api/firehose/status'))) {
+                    return false;
+                }
                 
                 // Check OPTIONS requests
-                if (this.firehoseExclusions['options'] && event.data && event.data.method === 'OPTIONS') return false;
+                if (this.firehoseExclusions['options'] && event.data && event.data.method === 'OPTIONS') {
+                    return false;
+                }
                 
                 // Check custom exclusions
                 for (const pattern of this.firehoseCustomExclusions) {
-                    if (line.includes(pattern.toLowerCase())) return false;
+                    if (pattern && line.includes(pattern.toLowerCase())) {
+                        return false;
+                    }
                 }
                 
                 return true;
@@ -1114,11 +1154,15 @@ class MCPProxyManager {
         const exclusionsDiv = document.getElementById('firehose-exclusions');
         
         if (this.firehoseNoiseReduction) {
+            // Noise reduction is ON - hiding noise
             btn.innerHTML = '<span id="firehose-noise-icon">🔇</span> Reduce Noise';
-            exclusionsDiv.style.display = 'none';
+            btn.style.background = 'var(--bg-success)';
+            exclusionsDiv.style.display = 'block';  // Show options when reducing noise
         } else {
+            // Noise reduction is OFF - showing all
             btn.innerHTML = '<span id="firehose-noise-icon">🔊</span> Show All';
-            exclusionsDiv.style.display = 'block';
+            btn.style.background = '';
+            exclusionsDiv.style.display = 'none';   // Hide options when showing all
         }
         
         // Re-apply filters

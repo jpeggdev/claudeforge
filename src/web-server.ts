@@ -2,6 +2,8 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server as HTTPServer } from 'http';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { ServerManager } from './server-manager.js';
 import { PermissionManager } from './permission-manager.js';
 import { LogManager } from './log-manager.js';
@@ -74,7 +76,17 @@ export class WebServer {
     });
     
     this.app.use(express.json());
-    this.app.use(express.static('public'));
+    
+    // Serve Vite build if available, otherwise fall back to public folder
+    const viteDistPath = join(process.cwd(), 'claudeforge-ui', 'dist');
+    
+    if (existsSync(viteDistPath)) {
+      // Serve the new Vite-built UI
+      this.app.use(express.static(viteDistPath));
+    } else {
+      // Fall back to the original public folder
+      this.app.use(express.static('public'));
+    }
   }
 
   private setupRoutes(): void {
@@ -422,7 +434,8 @@ export class WebServer {
             type: 'firehose',
             event
           }));
-          this.firehoseManager.captureWebSocketMessage(clientId, 'out', event);
+          // Don't capture firehose events as WebSocket messages to avoid circular reference
+          // this.firehoseManager.captureWebSocketMessage(clientId, 'out', event);
         }
       };
 
