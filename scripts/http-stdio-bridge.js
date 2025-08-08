@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * HTTP to STDIO Bridge for MCP Proxy
- * This bridges HTTP-based MCP proxy to stdio for Claude Code
+ * HTTP to STDIO Bridge for ClaudeForge
+ * This bridges HTTP-based ClaudeForge to stdio for Claude Code
  */
 
 const http = require('http');

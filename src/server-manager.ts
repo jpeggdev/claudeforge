@@ -63,38 +63,10 @@ export class ServerManager {
       switch (config.transport) {
         case 'stdio':
           if (!config.command) throw new Error('stdio transport requires command');
-          const childProcess = spawn(config.command, config.args || [], {
-            env: { ...process.env, ...config.env },
-            stdio: ['pipe', 'pipe', 'pipe']
-          }) as any;  // Type assertion to avoid complex type issues
-          
-          server.process = childProcess;
           transport = new StdioClientTransport({
             command: config.command,
             args: config.args,
             env: config.env
-          });
-          
-          childProcess.on('error', (error: Error) => {
-            this.logManager.error(`Process error: ${error.message}`, config.id, config.name, error);
-            server.status = 'error';
-            server.error = error.message;
-          });
-
-          childProcess.on('exit', (code: number | null) => {
-            if (code !== 0) {
-              this.logManager.warning(`Process exited with code ${code}`, config.id, config.name);
-            } else {
-              this.logManager.info(`Process exited normally`, config.id, config.name);
-            }
-            server.status = 'disconnected';
-          });
-
-          childProcess.stderr?.on('data', (data: Buffer) => {
-            const message = data.toString().trim();
-            if (message) {
-              this.logManager.error(`stderr: ${message}`, config.id, config.name);
-            }
           });
           break;
 

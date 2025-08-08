@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MCP Proxy Service Restart Script
+# ClaudeForge Service Restart Script
 # This script properly restarts the service without hanging the terminal
 
 set -e
@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Restarting MCP Proxy Service...${NC}"
+echo -e "${YELLOW}Restarting ClaudeForge Service...${NC}"
 
 # Stop the service
 echo "Stopping service..."

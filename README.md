@@ -118,7 +118,7 @@ cp .env.example .env
 
 ### Configuration Options
 
-- `port`: Port for the MCP proxy server (default: 3000)
+- `port`: Port for the ClaudeForge server (default: 3000)
 - `webPort`: Port for the web management interface (default: 8080)
 - `defaultPermissions`: Default permission policy ("allow" or "deny")
 - `servers`: Array of MCP server configurations
@@ -339,7 +339,7 @@ sc query ClaudeForge
 
 When running as a service, the proxy uses these default settings:
 
-- **Port**: 3000 (MCP proxy server)
+- **Port**: 3000 (ClaudeForge server)
 - **Web Port**: 8080 (Management interface)
 - **Config File**: Located in the installation directory
 - **Auto-restart**: Enabled (restarts on crash)

@@ -36,7 +36,7 @@ eventSource.onerror = (error) => {
 };
 
 eventSource.onopen = () => {
-  console.error('Connected to MCP proxy');
+  console.error('Connected to ClaudeForge');
 };
 
 // Handle stdin input and forward to server via POST

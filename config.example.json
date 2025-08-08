@@ -1,5 +1,4 @@
 {
-  "port": 3000,
   "webPort": 8080,
   "defaultPermissions": "allow",
   "servers": [

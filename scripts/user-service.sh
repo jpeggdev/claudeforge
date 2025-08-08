@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# User-friendly MCP Proxy service management script
+# User-friendly ClaudeForge service management script
 # No sudo required!
 
 set -e
@@ -16,7 +16,7 @@ SERVICE_NAME="mcp-proxy"
 
 case "$1" in
     install)
-        echo -e "${GREEN}Installing MCP Proxy as user service...${NC}"
+        echo -e "${GREEN}Installing ClaudeForge as user service...${NC}"
         
         # Create user systemd directory if it doesn't exist
         mkdir -p ~/.config/systemd/user
@@ -36,19 +36,19 @@ case "$1" in
         ;;
         
     start)
-        echo -e "${GREEN}Starting MCP Proxy...${NC}"
+        echo -e "${GREEN}Starting ClaudeForge...${NC}"
         systemctl --user start $SERVICE_NAME
         sleep 1
         systemctl --user status $SERVICE_NAME --no-pager
         ;;
         
     stop)
-        echo -e "${YELLOW}Stopping MCP Proxy...${NC}"
+        echo -e "${YELLOW}Stopping ClaudeForge...${NC}"
         systemctl --user stop $SERVICE_NAME
         ;;
         
     restart)
-        echo -e "${YELLOW}Restarting MCP Proxy...${NC}"
+        echo -e "${YELLOW}Restarting ClaudeForge...${NC}"
         systemctl --user restart $SERVICE_NAME
         sleep 1
         systemctl --user status $SERVICE_NAME --no-pager
@@ -63,7 +63,7 @@ case "$1" in
         ;;
         
     uninstall)
-        echo -e "${RED}Uninstalling MCP Proxy service...${NC}"
+        echo -e "${RED}Uninstalling ClaudeForge service...${NC}"
         systemctl --user stop $SERVICE_NAME 2>/dev/null || true
         systemctl --user disable $SERVICE_NAME 2>/dev/null || true
         rm -f ~/.config/systemd/user/$SERVICE_NAME.service
@@ -72,7 +72,7 @@ case "$1" in
         ;;
         
     build)
-        echo -e "${GREEN}Building MCP Proxy...${NC}"
+        echo -e "${GREEN}Building ClaudeForge...${NC}"
         cd "$PROJECT_DIR"
         npm install
         npm run build
@@ -80,7 +80,7 @@ case "$1" in
         ;;
         
     *)
-        echo "MCP Proxy User Service Manager"
+        echo "ClaudeForge User Service Manager"
         echo "Usage: $0 {install|start|stop|restart|status|logs|build|uninstall}"
         echo ""
         echo "  install   - Install and start the service"
