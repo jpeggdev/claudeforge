@@ -42,7 +42,13 @@ export function DebugInspectorPanel() {
       const response = await fetch('/api/debug/status')
       const data = await response.json()
       setDebugEnabled(data.enabled)
-      setStats(data.stats || stats)
+      setStats(data.stats || {
+        totalMessages: 0,
+        requests: 0,
+        responses: 0,
+        notifications: 0,
+        avgResponseTime: 0
+      })
     } catch (error) {
       console.error('Failed to load debug status:', error)
     }
