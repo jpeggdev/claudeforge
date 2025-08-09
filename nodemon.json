@@ -1,0 +1,9 @@
+{
+  "watch": ["src", "config.json"],
+  "ext": "ts,js,json",
+  "ignore": ["dist/**", "node_modules/**", "claudeforge-ui/**"],
+  "exec": "tsx",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

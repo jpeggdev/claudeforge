@@ -7,6 +7,7 @@ export interface MCPServerConfig {
   transport: 'stdio' | 'sse' | 'websocket' | 'http' | 'streamable-http';
   endpoint?: string;
   url?: string;  // Alternative to endpoint for HTTP transports
+  timeout?: number;  // Timeout in milliseconds for tool/resource/prompt calls (default: 30000)
 }
 
 export interface ToolPermission {
@@ -31,6 +32,7 @@ export interface ConnectedServer {
   id: string;
   config: MCPServerConfig;
   process?: any;
+  transport?: any;
   client: any;
   tools: Map<string, any>;
   resources?: Map<string, any>;

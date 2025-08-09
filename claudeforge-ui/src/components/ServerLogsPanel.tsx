@@ -54,7 +54,11 @@ export function ServerLogsPanel({ server }: ServerLogsPanelProps) {
         <ScrollArea className="h-full">
           <div className="p-4 space-y-2 font-mono text-xs">
             {logs.map((log, index) => (
-              <div key={index} className="flex gap-2 items-start">
+              <div 
+                key={index} 
+                className={`flex gap-2 items-start p-2 rounded transition-all duration-300 log-${log.level}`}
+                style={{ animation: 'slide-in 0.3s ease-out' }}
+              >
                 <span className="text-muted-foreground min-w-[80px]">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>

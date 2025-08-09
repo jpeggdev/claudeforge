@@ -10,6 +10,7 @@ import { LogManager } from './log-manager.js';
 import { DebugManager } from './debug-manager.js';
 import { FirehoseManager } from './firehose-manager.js';
 import { DebugTransportWrapper } from './debug-transport-wrapper.js';
+import { StdioToolHandler } from './stdio-tool-handler.js';
 // Polyfill for EventSource in Node.js
 import { EventSource } from 'eventsource';
 (global as any).EventSource = EventSource;
@@ -20,11 +21,13 @@ export class ServerManager {
   private logManager: LogManager;
   private debugManager: DebugManager;
   private firehoseManager: FirehoseManager;
+  private stdioToolHandler: StdioToolHandler;
 
   constructor(logManager: LogManager, debugManager: DebugManager, firehoseManager: FirehoseManager) {
     this.logManager = logManager;
     this.debugManager = debugManager;
     this.firehoseManager = firehoseManager;
+    this.stdioToolHandler = new StdioToolHandler(logManager);
   }
 
   registerDisabledServer(config: MCPServerConfig): void {
@@ -75,6 +78,8 @@ export class ServerManager {
             args: config.args,
             env: config.env
           });
+          // Store a reference to the transport for later process access
+          server.transport = transport;
           break;
 
         case 'sse':
@@ -237,6 +242,9 @@ export class ServerManager {
       this.stopServer(id)
     );
     await Promise.all(stopPromises);
+    
+    // Clean up stdio handler
+    this.stdioToolHandler.cleanup();
   }
 
   getServer(serverId: string): ConnectedServer | undefined {
@@ -256,14 +264,67 @@ export class ServerManager {
     }
 
     const startTime = Date.now();
+    this.logManager.info(`Calling tool ${toolName} on server ${serverId}`, serverId, server.config.name);
     this.firehoseManager.captureMCPRequest(serverId, server.config.name, toolName, args);
     
     try {
-      const result = await server.client.callTool(toolName, args);
+      const timeoutMs = server.config.timeout || 30000;
+      let result: any;
+
+      // Use custom stdio handler for stdio transport to work around SDK bug
+      if (server.config.transport === 'stdio' && server.transport) {
+        this.logManager.info(`Using custom stdio handler for tool call...`, serverId, server.config.name);
+        
+        // Access the private _process field from the transport
+        const childProcess = (server.transport as any)._process;
+        if (childProcess) {
+          // Set up the process in the stdio handler if not already done
+          if (!server.process) {
+            server.process = childProcess;
+            this.stdioToolHandler.setupProcess(childProcess, serverId, server.config.name);
+          }
+          
+          result = await this.stdioToolHandler.callTool(
+            childProcess,
+            toolName,
+            args,
+            serverId,
+            server.config.name,
+            timeoutMs
+          );
+        } else {
+          this.logManager.warning(`Stdio transport process not available, falling back to SDK`, serverId, server.config.name);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              this.logManager.error(`Tool call timeout for ${toolName}`, serverId, server.config.name);
+              reject(new Error(`Tool call timeout after ${timeoutMs / 1000} seconds`));
+            }, timeoutMs);
+          });
+          
+          const callPromise = server.client.callTool(toolName, args);
+          result = await Promise.race([callPromise, timeoutPromise]);
+        }
+      } else {
+        // Use standard SDK client for other transports
+        this.logManager.info(`Using standard MCP client for tool call...`, serverId, server.config.name);
+        
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            this.logManager.error(`Tool call timeout for ${toolName}`, serverId, server.config.name);
+            reject(new Error(`Tool call timeout after ${timeoutMs / 1000} seconds`));
+          }, timeoutMs);
+        });
+        
+        const callPromise = server.client.callTool(toolName, args);
+        result = await Promise.race([callPromise, timeoutPromise]);
+      }
+      
       const duration = Date.now() - startTime;
+      this.logManager.info(`Tool call completed in ${duration}ms`, serverId, server.config.name);
       this.firehoseManager.captureMCPResponse(serverId, server.config.name, toolName, result, duration);
       return result;
-    } catch (error) {
+    } catch (error: any) {
+      this.logManager.error(`Tool call failed: ${error.message}`, serverId, server.config.name);
       this.firehoseManager.captureMCPError(serverId, server.config.name, toolName, error);
       throw error;
     }
@@ -275,7 +336,18 @@ export class ServerManager {
       throw new Error(`Server ${serverId} not connected`);
     }
 
-    return await server.client.readResource(uri);
+    // Add timeout for resource reads
+    const timeoutMs = server.config.timeout || 30000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Resource read timeout after ${timeoutMs / 1000} seconds`));
+      }, timeoutMs);
+    });
+    
+    return await Promise.race([
+      server.client.readResource(uri),
+      timeoutPromise
+    ]);
   }
 
   async getPrompt(serverId: string, promptName: string, args: any): Promise<any> {
@@ -284,6 +356,17 @@ export class ServerManager {
       throw new Error(`Server ${serverId} not connected`);
     }
 
-    return await server.client.getPrompt(promptName, args);
+    // Add timeout for prompt operations
+    const timeoutMs = server.config.timeout || 30000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Prompt operation timeout after ${timeoutMs / 1000} seconds`));
+      }, timeoutMs);
+    });
+    
+    return await Promise.race([
+      server.client.getPrompt(promptName, args),
+      timeoutPromise
+    ]);
   }
 }

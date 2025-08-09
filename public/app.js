@@ -87,11 +87,25 @@ class MCPProxyManager {
         try {
             const response = await fetch('/api/sessions');
             const sessions = await response.json();
+            
+            console.log('=== LOAD SESSIONS ===');
+            console.log('Sessions loaded:', sessions);
+            
             if (sessions.length > 0) {
                 this.sessionId = sessions[0].id;
+                console.log('Session ID:', this.sessionId);
+                
+                // Clear existing permissions and load fresh from server
+                this.permissions.clear();
                 sessions[0].permissions.forEach(perm => {
+                    console.log(`Loading permission: ${perm.key} = ${perm.enabled}`);
                     this.permissions.set(perm.key, perm);
                 });
+                console.log('Total permissions loaded:', this.permissions.size);
+            } else {
+                // No sessions exist, create a new one by making a call that triggers session creation
+                // This will happen automatically when the first MCP request is made
+                console.log('No sessions found, will create one on first MCP request');
             }
         } catch (error) {
             console.error('Failed to load sessions:', error);
@@ -215,9 +229,63 @@ class MCPProxyManager {
         const totalTools = this.servers.reduce((sum, s) => sum + (s.tools?.length || 0), 0);
         const totalResources = this.servers.reduce((sum, s) => sum + (s.resources?.length || 0), 0);
         
-        document.getElementById('server-count').textContent = connectedServers;
-        document.getElementById('tool-count').textContent = totalTools;
-        document.getElementById('resource-count').textContent = totalResources;
+        // Animate number changes
+        this.animateNumber('server-count', connectedServers);
+        this.animateNumber('tool-count', totalTools);
+        this.animateNumber('resource-count', totalResources);
+        
+        // Show toast notification for significant changes
+        if (window.enhancedFormatters && window.enhancedFormatters.showToast) {
+            const prevServerCount = parseInt(document.getElementById('server-count').textContent) || 0;
+            if (prevServerCount !== connectedServers && prevServerCount > 0) {
+                if (connectedServers > prevServerCount) {
+                    window.enhancedFormatters.showToast('New server connected!', 'success');
+                } else {
+                    window.enhancedFormatters.showToast('Server disconnected', 'warning');
+                }
+            }
+        }
+        
+        // Render animated chart if available
+        if (window.enhancedFormatters && window.enhancedFormatters.renderAnimatedChart) {
+            const chartContainer = document.getElementById('stats-chart');
+            if (chartContainer && !chartContainer.hasChildNodes()) {
+                const chartData = [
+                    { label: 'Servers', value: connectedServers },
+                    { label: 'Tools', value: totalTools },
+                    { label: 'Resources', value: totalResources }
+                ];
+                window.enhancedFormatters.renderAnimatedChart(chartContainer, chartData);
+            }
+        }
+    }
+    
+    animateNumber(elementId, targetValue) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        const startValue = parseInt(element.textContent) || 0;
+        const duration = 500;
+        const startTime = Date.now();
+        
+        if (startValue === targetValue) {
+            element.textContent = targetValue;
+            return;
+        }
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const currentValue = Math.floor(startValue + (targetValue - startValue) * progress);
+            element.textContent = currentValue;
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        requestAnimationFrame(animate);
     }
 
     render() {
@@ -263,9 +331,9 @@ class MCPProxyManager {
                 <div class="server-info">${statusInfo}</div>
             `;
 
-            li.addEventListener('click', (e) => {
+            li.addEventListener('click', async (e) => {
                 if (!e.target.closest('button')) {
-                    this.selectServer(server);
+                    await this.selectServer(server);
                 }
             });
 
@@ -275,9 +343,35 @@ class MCPProxyManager {
         this.updateStats();
     }
 
-    selectServer(server) {
+    async selectServer(server) {
+        console.log('=== SELECT SERVER ===');
+        console.log('Selecting server:', server.id);
+        console.log('Permissions before reload:', Array.from(this.permissions.entries()));
+        
+        // Always reload permissions when switching servers to get latest state
+        await this.reloadPermissions();
+        
+        console.log('Permissions after reload:', Array.from(this.permissions.entries()));
+        
         this.selectedServer = server;
         this.render();
+        
+        // Scroll tools list back to top when switching servers
+        const toolsGrid = document.getElementById('tools-grid');
+        if (toolsGrid) {
+            toolsGrid.scrollTop = 0;
+        }
+        
+        // Also scroll resources and prompts to top
+        const resourcesGrid = document.getElementById('resources-grid');
+        if (resourcesGrid) {
+            resourcesGrid.scrollTop = 0;
+        }
+        
+        const promptsGrid = document.getElementById('prompts-grid');
+        if (promptsGrid) {
+            promptsGrid.scrollTop = 0;
+        }
         
         // Update server log filter if on server logs tab
         const activeTab = document.querySelector('.tab.active');
@@ -296,10 +390,22 @@ class MCPProxyManager {
             return;
         }
 
+        console.log('=== RENDER TOOLS ===');
+        console.log('Rendering for server:', this.selectedServer.id);
+        console.log('Current permissions map:', Array.from(this.permissions.entries()));
+        
         container.innerHTML = '';
         this.selectedServer.tools.forEach(tool => {
             const permKey = `${this.selectedServer.id}:${tool.name}`;
-            const permission = this.permissions.get(permKey) || { enabled: true };
+            const permission = this.permissions.get(permKey);
+            console.log(`Tool ${tool.name}: permKey=${permKey}, found=${!!permission}, enabled=${permission?.enabled}`);
+            
+            const finalPermission = permission || { 
+                serverId: this.selectedServer.id,
+                toolName: tool.name,
+                enabled: true,
+                permissions: { read: true, write: true, execute: true }
+            };
 
             const div = document.createElement('div');
             div.className = 'tool-card';
@@ -307,25 +413,27 @@ class MCPProxyManager {
                 <div class="tool-header">
                     <span class="tool-name">${tool.name}</span>
                     <label class="toggle-switch">
-                        <input type="checkbox" ${permission.enabled ? 'checked' : ''} 
-                               onchange="app.toggleTool('${this.selectedServer.id}', '${tool.name}', this.checked)">
+                        <input type="checkbox" ${finalPermission.enabled ? 'checked' : ''} 
+                               data-server="${this.selectedServer.id}" 
+                               data-tool="${tool.name}"
+                               onchange="app.handleToolToggle(this)">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 <div class="tool-description">${tool.description || 'No description'}</div>
                 <div class="permission-controls">
                     <label class="permission-label">
-                        <input type="checkbox" ${permission.permissions?.read ? 'checked' : ''} 
+                        <input type="checkbox" ${finalPermission.permissions?.read ? 'checked' : ''} 
                                onchange="app.updatePermission('${this.selectedServer.id}', '${tool.name}', 'read', this.checked)">
                         Read
                     </label>
                     <label class="permission-label">
-                        <input type="checkbox" ${permission.permissions?.write ? 'checked' : ''} 
+                        <input type="checkbox" ${finalPermission.permissions?.write ? 'checked' : ''} 
                                onchange="app.updatePermission('${this.selectedServer.id}', '${tool.name}', 'write', this.checked)">
                         Write
                     </label>
                     <label class="permission-label">
-                        <input type="checkbox" ${permission.permissions?.execute !== false ? 'checked' : ''} 
+                        <input type="checkbox" ${finalPermission.permissions?.execute !== false ? 'checked' : ''} 
                                onchange="app.updatePermission('${this.selectedServer.id}', '${tool.name}', 'execute', this.checked)">
                         Execute
                     </label>
@@ -416,13 +524,64 @@ class MCPProxyManager {
 
     async savePermission(serverId, toolName, permission) {
         try {
+            // Ensure serverId and toolName are in the permission object
+            const fullPermission = {
+                ...permission,
+                serverId,
+                toolName
+            };
+            
             await fetch(`/api/sessions/${this.sessionId}/permissions/${serverId}/${toolName}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(permission)
+                body: JSON.stringify(fullPermission)
             });
         } catch (error) {
             console.error('Failed to save permission:', error);
+        }
+    }
+    
+    async reloadPermissions() {
+        if (!this.sessionId) return;
+        
+        console.log('=== RELOAD PERMISSIONS ===');
+        console.log('Session ID:', this.sessionId);
+        
+        try {
+            const response = await fetch(`/api/sessions/${this.sessionId}/permissions`);
+            const permissions = await response.json();
+            
+            console.log('Permissions from server:', permissions);
+            
+            // Clear and reload all permissions
+            this.permissions.clear();
+            permissions.forEach(perm => {
+                console.log(`Setting ${perm.key} = ${perm.enabled}`);
+                this.permissions.set(perm.key, perm);
+            });
+            
+            console.log('Permissions map after reload:', Array.from(this.permissions.entries()));
+        } catch (error) {
+            console.error('Failed to reload permissions:', error);
+        }
+    }
+    
+    async handleToolToggle(checkbox) {
+        const serverId = checkbox.dataset.server;
+        const toolName = checkbox.dataset.tool;
+        const enabled = checkbox.checked;
+        
+        console.log('=== HANDLE TOOL TOGGLE ===');
+        console.log(`Toggling ${serverId}:${toolName} to ${enabled}`);
+        
+        // Disable the checkbox while saving
+        checkbox.disabled = true;
+        
+        try {
+            await this.toggleTool(serverId, toolName, enabled);
+            console.log('Toggle completed');
+        } finally {
+            checkbox.disabled = false;
         }
     }
 
@@ -661,6 +820,13 @@ class MCPProxyManager {
     }
 
     createLogEntry(log) {
+        // Use enhanced formatter if available
+        if (window.enhancedFormatters && window.enhancedFormatters.formatLogEntry) {
+            const div = document.createElement('div');
+            div.innerHTML = window.enhancedFormatters.formatLogEntry(log);
+            return div.firstElementChild;
+        }
+        
         const div = document.createElement('div');
         div.className = `log-entry ${log.level}`;
         

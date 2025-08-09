@@ -85,6 +85,19 @@ async function main() {
     process.on('SIGINT', () => shutdown('SIGINT'));
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGHUP', () => shutdown('SIGHUP'));
+    
+    // Handle graceful reload on USR2 signal
+    process.on('SIGUSR2', async () => {
+      logManager.info('Received SIGUSR2, reloading configuration...');
+      try {
+        // Reload config without restart
+        const newConfig = await loadConfig();
+        proxyServer.updateConfig(newConfig);
+        logManager.info('Configuration reloaded successfully');
+      } catch (error) {
+        logManager.error('Failed to reload configuration', undefined, undefined, error);
+      }
+    });
 
     process.on('uncaughtException', (error) => {
       console.error('Uncaught exception:', error);

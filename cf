@@ -1,0 +1,3 @@
+#!/bin/bash
+# ClaudeForge Quick Command
+exec /home/jpegg/code/ai/claudeforge/fast-restart.sh "$@"

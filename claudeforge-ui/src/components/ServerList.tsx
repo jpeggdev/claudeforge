@@ -58,18 +58,25 @@ export function ServerList({ servers, selectedServer, onServerSelect, onRefresh 
           {servers.map((server) => (
             <Card 
               key={server.id}
-              className={`cursor-pointer transition-colors hover:bg-accent ${
-                selectedServer === server.id ? 'ring-2 ring-primary' : ''
+              className={`cursor-pointer card-hover transition-all duration-300 ${
+                selectedServer === server.id ? 'ring-2 ring-primary glow-purple' : ''
               } ${server.disabled ? 'opacity-60' : ''}`}
               onClick={() => !server.disabled && onServerSelect(server.id)}
+              style={{ animation: 'slide-in 0.3s ease-out' }}
             >
               <CardContent className="p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
+                      <div className={`status-indicator ${
+                        server.status === 'connected' ? 'online' : 
+                        server.status === 'connecting' ? 'pending' : 'offline'
+                      }`} />
                       <Badge
                         variant={server.status === 'connected' ? "default" : "secondary"}
-                        className="text-xs"
+                        className={`text-xs ${
+                          server.status === 'connected' ? 'gradient-green text-white' : ''
+                        }`}
                       >
                         {server.status === 'connected' ? 'Connected' : 'Disconnected'}
                       </Badge>

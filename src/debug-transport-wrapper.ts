@@ -25,11 +25,10 @@ export class DebugTransportWrapper {
 
   private wrapTransport(): void {
     const originalSend = this.originalTransport.send?.bind(this.originalTransport);
-    let originalOnMessage = this.originalTransport.onmessage;
     
     // Wrap the send method to intercept outgoing messages
     if (originalSend) {
-      this.originalTransport.send = (message: any) => {
+      this.originalTransport.send = async (message: any) => {
         this.debugManager.interceptMessage(
           this.serverId,
           this.serverName,
@@ -41,11 +40,17 @@ export class DebugTransportWrapper {
       };
     }
 
+    // Store original onmessage setter if it exists
+    const originalDescriptor = Object.getOwnPropertyDescriptor(this.originalTransport, 'onmessage');
+    let currentHandler: any = null;
+    
     // Wrap the onmessage handler to intercept incoming messages
     Object.defineProperty(this.originalTransport, 'onmessage', {
-      get: () => originalOnMessage,
+      configurable: true,
+      enumerable: true,
+      get: () => currentHandler,
       set: (handler: any) => {
-        const wrappedHandler = (message: any) => {
+        currentHandler = (message: any) => {
           this.debugManager.interceptMessage(
             this.serverId,
             this.serverName,
@@ -54,10 +59,17 @@ export class DebugTransportWrapper {
             message
           );
           if (handler) {
-            handler(message);
+            return handler(message);
           }
         };
-        originalOnMessage = wrappedHandler;
+        
+        // If there was an original setter, call it with the wrapped handler
+        if (originalDescriptor && originalDescriptor.set) {
+          originalDescriptor.set.call(this.originalTransport, currentHandler);
+        } else {
+          // Otherwise just assign it directly
+          this.originalTransport._onmessage = currentHandler;
+        }
       }
     });
   }

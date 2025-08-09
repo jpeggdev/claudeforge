@@ -23,38 +23,104 @@ interface ToolsPanelProps {
 export function ToolsPanel({ server }: ToolsPanelProps) {
   const [toolPermissions, setToolPermissions] = useState<Map<string, ToolPermission>>(new Map())
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
+  // Load permissions from server when component mounts or server changes
   useEffect(() => {
-    if (server?.tools) {
-      const newPermissions = new Map<string, ToolPermission>()
-      server.tools.forEach((tool: any) => {
-        const key = `${server.id}:${tool.name}`
-        newPermissions.set(key, {
-          toolName: tool.name,
-          serverId: server.id,
-          enabled: true,
-          permissions: {
-            read: true,
-            write: true,
-            execute: true
-          }
-        })
-      })
-      setToolPermissions(newPermissions)
-    }
+    loadPermissions()
   }, [server])
 
-  const handleToggleTool = (toolName: string, enabled: boolean) => {
+  const loadPermissions = async () => {
+    try {
+      // Get sessions first
+      const sessionsRes = await fetch('/api/sessions')
+      const sessions = await sessionsRes.json()
+      
+      if (sessions.length > 0) {
+        const session = sessions[0]
+        setSessionId(session.id)
+        
+        // Load permissions for this session
+        const permsRes = await fetch(`/api/sessions/${session.id}/permissions`)
+        const permissions = await permsRes.json()
+        
+        const newPermissions = new Map<string, ToolPermission>()
+        
+        // First, add all tools with defaults
+        if (server?.tools) {
+          server.tools.forEach((tool: any) => {
+            const key = `${server.id}:${tool.name}`
+            newPermissions.set(key, {
+              toolName: tool.name,
+              serverId: server.id,
+              enabled: true,
+              permissions: {
+                read: true,
+                write: true,
+                execute: true
+              }
+            })
+          })
+        }
+        
+        // Then override with saved permissions
+        permissions.forEach((perm: any) => {
+          if (perm.serverId === server?.id) {
+            newPermissions.set(perm.key, perm)
+          }
+        })
+        
+        setToolPermissions(newPermissions)
+      }
+    } catch (error) {
+      console.error('Failed to load permissions:', error)
+      // Fall back to defaults
+      if (server?.tools) {
+        const newPermissions = new Map<string, ToolPermission>()
+        server.tools.forEach((tool: any) => {
+          const key = `${server.id}:${tool.name}`
+          newPermissions.set(key, {
+            toolName: tool.name,
+            serverId: server.id,
+            enabled: true,
+            permissions: {
+              read: true,
+              write: true,
+              execute: true
+            }
+          })
+        })
+        setToolPermissions(newPermissions)
+      }
+    }
+  }
+
+  const handleToggleTool = async (toolName: string, enabled: boolean) => {
     const key = `${server.id}:${toolName}`
+    const current = toolPermissions.get(key)
+    
+    if (!current || !sessionId) return
+    
+    // Update local state immediately
     setToolPermissions(prev => {
       const newMap = new Map(prev)
-      const current = newMap.get(key)
-      if (current) {
-        newMap.set(key, { ...current, enabled })
-      }
+      newMap.set(key, { ...current, enabled })
       return newMap
     })
-    updateToolPermission(server.id, toolName, enabled)
+    
+    // Save to server
+    try {
+      await fetch(`/api/sessions/${sessionId}/permissions/${server.id}/${toolName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...current,
+          enabled
+        })
+      })
+    } catch (error) {
+      console.error('Failed to save permission:', error)
+    }
   }
 
   const handlePermissionChange = (toolName: string, permission: 'read' | 'write' | 'execute', checked: boolean) => {
@@ -77,11 +143,26 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
   }
 
   const updateToolPermission = async (serverId: string, toolName: string, enabled?: boolean, permissions?: any) => {
+    if (!sessionId) return
+    
+    const key = `${serverId}:${toolName}`
+    const current = toolPermissions.get(key)
+    if (!current) return
+    
     try {
-      await fetch('/api/permissions/tool', {
+      await fetch(`/api/sessions/${sessionId}/permissions/${serverId}/${toolName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serverId, toolName, enabled, permissions })
+        body: JSON.stringify({
+          ...current,
+          ...(enabled !== undefined && { enabled }),
+          ...(permissions && { 
+            permissions: { 
+              ...current.permissions, 
+              ...permissions 
+            } 
+          })
+        })
       })
     } catch (error) {
       console.error('Failed to update tool permission:', error)

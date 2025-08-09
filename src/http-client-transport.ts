@@ -9,7 +9,7 @@ import fetch from 'node-fetch';
 export class HttpClientTransport implements Transport {
   private url: URL;
   private closed = false;
-  private sessionId: string | null = null;
+  sessionId: string | undefined = undefined;
   
   // Transport interface properties
   onclose?: () => void;

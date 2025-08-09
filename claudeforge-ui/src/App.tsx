@@ -49,7 +49,7 @@ function App() {
       {/* Header - Fixed */}
       <header className="flex items-center justify-between px-6 py-3 border-b bg-background">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+          <div className="w-10 h-10 gradient-purple rounded-lg flex items-center justify-center text-white font-bold glow-purple">
             CF
           </div>
           <div>
@@ -58,13 +58,17 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={isConnected ? "default" : "destructive"}>
+          <Badge 
+            variant={isConnected ? "default" : "destructive"}
+          >
+            <div className={`inline-block w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
             {isConnected ? 'Connected' : 'Disconnected'}
           </Badge>
           <Button 
             variant="outline" 
             size="sm"
             onClick={handleReloadConfig}
+            className="relative z-10"
           >
             Reload Config
           </Button>
@@ -72,7 +76,21 @@ function App() {
       </header>
 
       {/* Main Content - Flex container that fills remaining height */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Particle Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="particle"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 15}s`,
+                animationDuration: `${15 + Math.random() * 10}s`
+              }}
+            />
+          ))}
+        </div>
         {/* Sidebar - Fixed width with own scroll */}
         <aside className="w-80 border-r bg-muted/10 overflow-hidden flex flex-col">
           <ServerList 
@@ -89,10 +107,10 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Tabs defaultValue="tools" className="h-full flex flex-col">
               <TabsList className="grid w-full grid-cols-4 shrink-0">
-                <TabsTrigger value="tools">Tools</TabsTrigger>
-                <TabsTrigger value="resources">Resources</TabsTrigger>
-                <TabsTrigger value="prompts">Prompts</TabsTrigger>
-                <TabsTrigger value="logs">Server Logs</TabsTrigger>
+                <TabsTrigger value="tools" className="tab-gradient">Tools</TabsTrigger>
+                <TabsTrigger value="resources" className="tab-gradient">Resources</TabsTrigger>
+                <TabsTrigger value="prompts" className="tab-gradient">Prompts</TabsTrigger>
+                <TabsTrigger value="logs" className="tab-gradient">Server Logs</TabsTrigger>
               </TabsList>
               <TabsContent value="tools" className="flex-1 overflow-hidden mt-4">
                 <ToolsPanel server={selectedServerData} />
@@ -113,8 +131,8 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Tabs defaultValue="firehose" className="h-full flex flex-col">
               <TabsList className="grid w-full grid-cols-3 shrink-0">
-                <TabsTrigger value="firehose">Firehose</TabsTrigger>
-                <TabsTrigger value="debug">Debug Inspector</TabsTrigger>
+                <TabsTrigger value="firehose" className="gradient-pink text-white">Firehose</TabsTrigger>
+                <TabsTrigger value="debug" className="gradient-blue text-white">Debug Inspector</TabsTrigger>
                 <TabsTrigger value="system-logs">System Logs</TabsTrigger>
               </TabsList>
               <TabsContent value="firehose" className="flex-1 overflow-hidden mt-4">

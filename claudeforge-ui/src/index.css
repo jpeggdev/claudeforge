@@ -57,3 +57,260 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Enhanced Animations and Colors */
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.8);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Enhanced Status Indicators */
+.status-indicator {
+  @apply relative inline-block w-3 h-3 rounded-full;
+}
+
+.status-indicator.online {
+  @apply bg-green-500;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.status-indicator.online::after {
+  content: '';
+  @apply absolute inset-0 rounded-full border-2 border-green-500;
+  animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.status-indicator.offline {
+  @apply bg-red-500;
+}
+
+.status-indicator.pending {
+  @apply bg-yellow-500;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Gradient Backgrounds */
+.gradient-purple {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 10s ease infinite;
+}
+
+.gradient-blue {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 10s ease infinite;
+}
+
+.gradient-green {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 10s ease infinite;
+}
+
+.gradient-pink {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 10s ease infinite;
+}
+
+/* Enhanced Cards */
+.card-hover {
+  @apply transition-all duration-300 ease-out;
+}
+
+.card-hover:hover {
+  @apply shadow-2xl;
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  @apply inline-block w-8 h-8 border-4 border-gray-200 rounded-full;
+  border-top-color: #667eea;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast Notifications */
+.toast-enter {
+  animation: slide-in 0.3s ease-out;
+}
+
+.toast-exit {
+  animation: slide-out 0.3s ease-out forwards;
+}
+
+@keyframes slide-out {
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Console Log Colors */
+.log-error {
+  @apply text-red-500 bg-red-50 dark:bg-red-950 border-l-4 border-red-500 pl-2;
+}
+
+.log-warning {
+  @apply text-yellow-600 bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-500 pl-2;
+}
+
+.log-success {
+  @apply text-green-600 bg-green-50 dark:bg-green-950 border-l-4 border-green-500 pl-2;
+}
+
+.log-info {
+  @apply text-blue-600 bg-blue-50 dark:bg-blue-950 border-l-4 border-blue-500 pl-2;
+}
+
+.log-debug {
+  @apply text-purple-600 bg-purple-50 dark:bg-purple-950 border-l-4 border-purple-500 pl-2;
+}
+
+/* Animated Number Counter */
+.number-animate {
+  @apply tabular-nums;
+  animation: number-pop 0.5s ease-out;
+}
+
+@keyframes number-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Floating Action Button */
+.fab {
+  @apply fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-300;
+  animation: float 3s ease-in-out infinite;
+}
+
+.fab:hover {
+  @apply shadow-2xl;
+  transform: scale(1.1) rotate(90deg);
+}
+
+/* Particle Background */
+.particle {
+  @apply absolute w-1 h-1 bg-indigo-400 rounded-full opacity-50;
+  animation: particle-float 15s linear infinite;
+}
+
+@keyframes particle-float {
+  from {
+    transform: translateY(100vh) translateX(0);
+    opacity: 0;
+  }
+  10% { opacity: 0.5; }
+  90% { opacity: 0.5; }
+  to {
+    transform: translateY(-100vh) translateX(100px);
+    opacity: 0;
+  }
+}
+
+/* Ripple Effect */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(0);
+  animation: ripple-effect 0.6s ease-out;
+  pointer-events: none;
+}
+
+@keyframes ripple-effect {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Skeleton Loading */
+.skeleton {
+  @apply bg-gray-200 dark:bg-gray-700 rounded;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Glow Effects */
+.glow-purple {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+}
+
+.glow-blue {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+}
+
+.glow-green {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.5);
+}
+
+/* Tab Animations */
+.tab-gradient {
+  @apply relative overflow-hidden;
+}
+
+.tab-gradient::before {
+  content: '';
+  @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+.tab-gradient:hover::before {
+  @apply opacity-100;
+}
+
+/* Chart Animations */
+.chart-bar {
+  animation: chart-grow 1s ease-out forwards;
+  transform-origin: bottom;
+}
+
+@keyframes chart-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}

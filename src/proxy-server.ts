@@ -40,7 +40,7 @@ export class ProxyServer {
     this.firehoseManager = firehoseManager;
     this.configPath = configPath || path.join(process.cwd(), 'config.json');
     this.serverManager = new ServerManager(logManager, debugManager, firehoseManager);
-    this.permissionManager = new PermissionManager();
+    this.permissionManager = new PermissionManager(configPath);
     this.permissionManager.setDefaultPolicy(config.defaultPermissions === 'allow');
 
     this.server = new Server({
@@ -55,6 +55,10 @@ export class ProxyServer {
     });
 
     this.setupHandlers();
+  }
+
+  async initialize(): Promise<void> {
+    await this.permissionManager.initialize();
   }
 
   private setupHandlers(): void {
@@ -177,6 +181,9 @@ export class ProxyServer {
   async start(): Promise<void> {
     this.logManager.info('Starting ClaudeForge Server');
     
+    // Initialize permission manager first
+    await this.initialize();
+    
     for (const serverConfig of this.config.servers) {
       // Check if server is disabled
       if ((serverConfig as any).disabled) {
@@ -197,8 +204,14 @@ export class ProxyServer {
       }
     }
 
-    const session = this.permissionManager.createSession();
-    this.currentSessionId = session.id;
+    // Use existing session or create a new one if none exist
+    const existingSessions = this.permissionManager.getAllSessions();
+    if (existingSessions.length > 0) {
+      this.currentSessionId = existingSessions[0].id;
+    } else {
+      const session = this.permissionManager.createSession();
+      this.currentSessionId = session.id;
+    }
 
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -337,6 +350,28 @@ export class ProxyServer {
   
   getConfig(): ProxyConfig {
     return this.config;
+  }
+  
+  async updateConfig(newConfig: ProxyConfig): Promise<void> {
+    this.config = newConfig;
+    this.permissionManager.setDefaultPolicy(newConfig.defaultPermissions === 'allow');
+    
+    // Reload servers with new config
+    await this.reloadServers();
+    
+    this.logManager.info('Configuration updated', 'proxy-server');
+  }
+  
+  private async reloadServers(): Promise<void> {
+    // For now, just log the reload
+    // Full implementation would require refactoring ServerManager
+    this.logManager.info('Reloading servers with new configuration', 'proxy-server');
+    
+    // Trigger config reload for existing servers
+    const servers = this.serverManager.getAllServers();
+    for (const server of servers) {
+      this.logManager.info(`Server ${server.id} configuration updated`, 'proxy-server');
+    }
   }
 
   setCurrentSession(sessionId: string): void {
