@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import type { Server, Resource } from '@/types'
 
 interface ResourcesPanelProps {
-  server: any
+  server: Server | null
 }
 
 export function ResourcesPanel({ server }: ResourcesPanelProps) {
@@ -28,7 +29,7 @@ export function ResourcesPanel({ server }: ResourcesPanelProps) {
   return (
     <ScrollArea className="h-full">
       <div className="space-y-3 p-1 pr-4">
-        {resources.map((resource: any, index: number) => (
+        {resources.map((resource: Resource, index: number) => (
           <Card key={index}>
             <CardHeader>
               <div className="flex items-start justify-between">

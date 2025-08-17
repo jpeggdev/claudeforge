@@ -6,9 +6,10 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Download, Trash2 } from 'lucide-react'
+import type { FirehoseEvent, BadgeVariant } from '@/types'
 
 export function FirehosePanel() {
-  const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<FirehoseEvent[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const [filter, setFilter] = useState('')
@@ -22,7 +23,7 @@ export function FirehosePanel() {
       eventSourceRef.current = new EventSource('/api/firehose/stream')
       
       eventSourceRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data)
+        const data: FirehoseEvent = JSON.parse(event.data)
         
         // Apply noise reduction filter
         if (noiseReduction) {
@@ -81,7 +82,7 @@ export function FirehosePanel() {
     URL.revokeObjectURL(url)
   }
 
-  const getEventColor = (type: string) => {
+  const getEventColor = (type: string): BadgeVariant => {
     if (type.includes('error')) return 'destructive'
     if (type.includes('warning')) return 'outline'
     if (type.includes('success')) return 'default'
@@ -156,7 +157,7 @@ export function FirehosePanel() {
                   })}
                 </span>
                 <Badge 
-                  variant={getEventColor(event.type) as any}
+                  variant={getEventColor(event.type)}
                   className="min-w-[80px] text-xs"
                 >
                   {event.type}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,18 +12,15 @@ import { DebugInspectorPanel } from './components/DebugInspectorPanel'
 import { SystemLogsPanel } from './components/SystemLogsPanel'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useAPI } from './hooks/useAPI'
+import type { Server } from './types'
 
 function App() {
   const [selectedServer, setSelectedServer] = useState<string | null>(null)
-  const [servers, setServers] = useState<any[]>([])
+  const [servers, setServers] = useState<Server[]>([])
   const { isConnected } = useWebSocket()
   const { fetchServers, reloadConfig } = useAPI()
 
-  useEffect(() => {
-    loadServers()
-  }, [])
-
-  const loadServers = async () => {
+  const loadServers = useCallback(async () => {
     const data = await fetchServers()
     if (data) {
       setServers(data)
@@ -31,7 +28,11 @@ function App() {
         setSelectedServer(data[0].id)
       }
     }
-  }
+  }, [fetchServers, selectedServer])
+
+  useEffect(() => {
+    loadServers()
+  }, [loadServers])
 
   const handleServerSelect = (serverId: string) => {
     setSelectedServer(serverId)
@@ -42,7 +43,7 @@ function App() {
     await loadServers()
   }
 
-  const selectedServerData = servers.find(s => s.id === selectedServer)
+  const selectedServerData = servers.find(s => s.id === selectedServer) || null
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">

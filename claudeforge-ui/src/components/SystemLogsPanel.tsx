@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Trash2 } from 'lucide-react'
+import type { LogEntry, BadgeVariant } from '@/types'
 
 export function SystemLogsPanel() {
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<LogEntry[]>([])
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export function SystemLogsPanel() {
     ])
   }, [])
 
-  const getLevelVariant = (level: string): any => {
+  const getLevelVariant = (level: string): BadgeVariant => {
     switch (level) {
       case 'error': return 'destructive'
       case 'warning': return 'outline'

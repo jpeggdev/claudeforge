@@ -5,18 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { RefreshCw, Plus, X } from 'lucide-react'
 import { useState } from 'react'
-
-interface Server {
-  id: string
-  name: string
-  transport?: string
-  status?: string
-  connected?: boolean
-  disabled?: boolean
-  tools?: any[]
-  resources?: any[]
-  prompts?: any[]
-}
+import type { Server } from '@/types'
 
 interface ServerListProps {
   servers: Server[]

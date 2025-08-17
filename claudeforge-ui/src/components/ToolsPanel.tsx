@@ -1,23 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-
-interface ToolPermission {
-  toolName: string
-  serverId: string
-  enabled: boolean
-  permissions: {
-    read: boolean
-    write: boolean
-    execute: boolean
-  }
-}
+import type { Server, Tool, ToolPermission, SessionInfo } from '@/types'
 
 interface ToolsPanelProps {
-  server: any
+  server: Server | null
 }
 
 export function ToolsPanel({ server }: ToolsPanelProps) {
@@ -25,16 +15,11 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  // Load permissions from server when component mounts or server changes
-  useEffect(() => {
-    loadPermissions()
-  }, [server])
-
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
       // Get sessions first
       const sessionsRes = await fetch('/api/sessions')
-      const sessions = await sessionsRes.json()
+      const sessions: SessionInfo[] = await sessionsRes.json()
       
       if (sessions.length > 0) {
         const session = sessions[0]
@@ -42,13 +27,13 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
         
         // Load permissions for this session
         const permsRes = await fetch(`/api/sessions/${session.id}/permissions`)
-        const permissions = await permsRes.json()
+        const permissions: ToolPermission[] = await permsRes.json()
         
         const newPermissions = new Map<string, ToolPermission>()
         
         // First, add all tools with defaults
         if (server?.tools) {
-          server.tools.forEach((tool: any) => {
+          server.tools.forEach((tool: Tool) => {
             const key = `${server.id}:${tool.name}`
             newPermissions.set(key, {
               toolName: tool.name,
@@ -64,8 +49,8 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
         }
         
         // Then override with saved permissions
-        permissions.forEach((perm: any) => {
-          if (perm.serverId === server?.id) {
+        permissions.forEach((perm: ToolPermission) => {
+          if (perm.serverId === server?.id && perm.key) {
             newPermissions.set(perm.key, perm)
           }
         })
@@ -77,7 +62,7 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
       // Fall back to defaults
       if (server?.tools) {
         const newPermissions = new Map<string, ToolPermission>()
-        server.tools.forEach((tool: any) => {
+        server.tools.forEach((tool: Tool) => {
           const key = `${server.id}:${tool.name}`
           newPermissions.set(key, {
             toolName: tool.name,
@@ -93,9 +78,16 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
         setToolPermissions(newPermissions)
       }
     }
-  }
+  }, [server])
+
+  // Load permissions from server when component mounts or server changes
+  useEffect(() => {
+    loadPermissions()
+  }, [loadPermissions])
 
   const handleToggleTool = async (toolName: string, enabled: boolean) => {
+    if (!server) return
+    
     const key = `${server.id}:${toolName}`
     const current = toolPermissions.get(key)
     
@@ -124,6 +116,8 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
   }
 
   const handlePermissionChange = (toolName: string, permission: 'read' | 'write' | 'execute', checked: boolean) => {
+    if (!server) return
+    
     const key = `${server.id}:${toolName}`
     setToolPermissions(prev => {
       const newMap = new Map(prev)
@@ -142,7 +136,7 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
     updateToolPermission(server.id, toolName, undefined, { [permission]: checked })
   }
 
-  const updateToolPermission = async (serverId: string, toolName: string, enabled?: boolean, permissions?: any) => {
+  const updateToolPermission = async (serverId: string, toolName: string, enabled?: boolean, permissions?: Partial<ToolPermission['permissions']>) => {
     if (!sessionId) return
     
     const key = `${serverId}:${toolName}`
@@ -202,7 +196,7 @@ export function ToolsPanel({ server }: ToolsPanelProps) {
   return (
     <ScrollArea className="h-full">
       <div className="space-y-3 p-1 pr-4">
-        {tools.map((tool: any) => {
+        {tools.map((tool: Tool) => {
           const key = `${server.id}:${tool.name}`
           const permission = toolPermissions.get(key)
           const isEnabled = permission?.enabled ?? true

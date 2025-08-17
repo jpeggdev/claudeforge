@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { WebSocketMessage } from '@/types'
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false)
@@ -28,7 +29,7 @@ export function useWebSocket() {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data)
+          const data: WebSocketMessage = JSON.parse(event.data)
           // Handle different message types
           handleMessage(data)
         } catch (error) {
@@ -56,7 +57,7 @@ export function useWebSocket() {
     }
   }, [connect])
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message))
     } else {
@@ -64,7 +65,7 @@ export function useWebSocket() {
     }
   }, [])
 
-  const handleMessage = (data: any) => {
+  const handleMessage = (data: WebSocketMessage) => {
     // Handle different message types from the server
     switch (data.type) {
       case 'server-status':

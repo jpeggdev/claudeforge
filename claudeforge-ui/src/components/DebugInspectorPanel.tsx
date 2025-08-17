@@ -5,11 +5,12 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Download, Trash2 } from 'lucide-react'
+import type { DebugMessage, DebugStats, BadgeVariant } from '@/types'
 
 export function DebugInspectorPanel() {
   const [debugEnabled, setDebugEnabled] = useState(false)
-  const [messages, setMessages] = useState<any[]>([])
-  const [stats, setStats] = useState({
+  const [messages, setMessages] = useState<DebugMessage[]>([])
+  const [stats, setStats] = useState<DebugStats>({
     totalMessages: 0,
     requests: 0,
     responses: 0,
@@ -26,7 +27,7 @@ export function DebugInspectorPanel() {
       const eventSource = new EventSource('/api/debug/stream')
       
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
+        const data: DebugMessage = JSON.parse(event.data)
         setMessages(prev => [...prev.slice(-99), data])
         updateStats(data)
       }
@@ -42,7 +43,7 @@ export function DebugInspectorPanel() {
       const response = await fetch('/api/debug/status')
       const data = await response.json()
       setDebugEnabled(data.enabled)
-      setStats(data.stats || {
+      setStats(data.stats as DebugStats || {
         totalMessages: 0,
         requests: 0,
         responses: 0,
@@ -67,7 +68,7 @@ export function DebugInspectorPanel() {
     }
   }
 
-  const updateStats = (message: any) => {
+  const updateStats = (message: DebugMessage) => {
     setStats(prev => ({
       totalMessages: prev.totalMessages + 1,
       requests: prev.requests + (message.type === 'request' ? 1 : 0),
@@ -94,7 +95,7 @@ export function DebugInspectorPanel() {
     }
   }
 
-  const getTypeVariant = (type: string): any => {
+  const getTypeVariant = (type: string): BadgeVariant => {
     switch (type) {
       case 'request': return 'default'
       case 'response': return 'secondary'
