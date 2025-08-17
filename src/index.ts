@@ -20,7 +20,7 @@ async function loadConfig(): Promise<ProxyConfig> {
   } catch (error) {
     console.log('No config file found, using default configuration');
     return {
-      port: parseInt(process.env.CLAUDEFORGE_PORT || '3000'),
+      port: parseInt(process.env.CLAUDEFORGE_PORT || '3100'),
       webPort: parseInt(process.env.CLAUDEFORGE_WEB_PORT || '8080'),
       defaultPermissions: (process.env.CLAUDEFORGE_DEFAULT_PERMISSIONS as 'allow' | 'deny') || 'allow',
       servers: []

@@ -327,13 +327,42 @@ class MCPProxyManager {
             }
             
             li.innerHTML = `
-                <div class="server-name">${server.name}</div>
-                <div class="server-info">${statusInfo}</div>
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="flex: 1;">
+                        <div class="server-name">${server.name}</div>
+                        <div class="server-info">${statusInfo}</div>
+                    </div>
+                    <div class="server-actions" style="display: flex; gap: 0.25rem;">
+                        <button class="server-action-btn refresh-btn" data-server-id="${server.id}" title="Refresh server">
+                            🔄
+                        </button>
+                        <button class="server-action-btn remove-btn" data-server-id="${server.id}" title="Remove server">
+                            ❌
+                        </button>
+                    </div>
+                </div>
             `;
 
+            // Handle server selection
             li.addEventListener('click', async (e) => {
                 if (!e.target.closest('button')) {
                     await this.selectServer(server);
+                }
+            });
+
+            // Handle refresh button
+            const refreshBtn = li.querySelector('.refresh-btn');
+            refreshBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.refreshServer(server.id);
+            });
+
+            // Handle remove button
+            const removeBtn = li.querySelector('.remove-btn');
+            removeBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`Remove server "${server.name}"?`)) {
+                    await this.removeServer(server.id);
                 }
             });
 
@@ -1355,6 +1384,163 @@ class MCPProxyManager {
         
         // Re-apply filters
         this.updateFirehoseDisplay();
+    }
+
+    async refreshServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/restart`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to refresh server: ${response.statusText}`);
+            }
+            
+            // Reload servers list
+            await this.loadServers();
+        } catch (error) {
+            console.error('Error refreshing server:', error);
+            alert(`Failed to refresh server: ${error.message}`);
+        }
+    }
+
+    async removeServer(serverId) {
+        try {
+            const response = await fetch(`/api/servers/${serverId}/remove`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to remove server: ${response.statusText}`);
+            }
+            
+            // If this was the selected server, clear selection
+            if (this.selectedServer?.id === serverId) {
+                this.selectedServer = null;
+                this.updateMainContent();
+            }
+            
+            // Reload servers list
+            await this.loadServers();
+        } catch (error) {
+            console.error('Error removing server:', error);
+            alert(`Failed to remove server: ${error.message}`);
+        }
+    }
+
+    showAddServerDialog() {
+        const dialog = document.createElement('div');
+        dialog.className = 'modal-overlay';
+        dialog.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            width: 500px;
+            max-width: 90vw;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        `;
+        
+        modal.innerHTML = `
+            <h2 style="margin-bottom: 1.5rem; color: var(--text-primary);">Add New MCP Server</h2>
+            <form id="add-server-form">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Server Name</label>
+                    <input type="text" name="name" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-default); border-radius: 8px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Transport Type</label>
+                    <select name="transport" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-default); border-radius: 8px;">
+                        <option value="stdio">Stdio</option>
+                        <option value="sse">SSE</option>
+                        <option value="websocket">WebSocket</option>
+                        <option value="http">HTTP</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Command</label>
+                    <input type="text" name="command" required placeholder="e.g., node, python, npx" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-default); border-radius: 8px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Arguments (one per line)</label>
+                    <textarea name="args" rows="3" placeholder="e.g., /path/to/server.js" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-default); border-radius: 8px; font-family: 'Space Mono', monospace;"></textarea>
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Environment Variables (optional, JSON format)</label>
+                    <textarea name="env" rows="2" placeholder='{"API_KEY": "value"}' style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-default); border-radius: 8px; font-family: 'Space Mono', monospace;"></textarea>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding: 0.5rem 1rem; border: 1px solid var(--border-default); border-radius: 8px; background: white; cursor: pointer;">Cancel</button>
+                    <button type="submit" style="padding: 0.5rem 1rem; background: var(--purple-primary); color: white; border: none; border-radius: 8px; cursor: pointer;">Add Server</button>
+                </div>
+            </form>
+        `;
+        
+        dialog.appendChild(modal);
+        document.body.appendChild(dialog);
+        
+        // Handle form submission
+        const form = document.getElementById('add-server-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const serverConfig = {
+                name: formData.get('name'),
+                transport: formData.get('transport'),
+                command: formData.get('command'),
+                args: formData.get('args').split('\n').filter(arg => arg.trim()),
+                env: {}
+            };
+            
+            // Parse environment variables if provided
+            const envJson = formData.get('env').trim();
+            if (envJson) {
+                try {
+                    serverConfig.env = JSON.parse(envJson);
+                } catch (error) {
+                    alert('Invalid JSON format for environment variables');
+                    return;
+                }
+            }
+            
+            try {
+                const response = await fetch('/api/servers/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(serverConfig)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || response.statusText);
+                }
+                
+                // Close dialog
+                dialog.remove();
+                
+                // Reload servers
+                await this.loadServers();
+            } catch (error) {
+                console.error('Error adding server:', error);
+                alert(`Failed to add server: ${error.message}`);
+            }
+        });
     }
 }
 

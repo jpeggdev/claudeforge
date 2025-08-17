@@ -3,35 +3,13 @@
   "globalPermissions": [],
   "sessions": [
     {
-      "id": "7c164187-5ccb-40fd-91eb-2b020fd6a6a2",
-      "connectedAt": "2025-08-09T02:51:16.562Z",
-      "permissions": [
-        {
-          "key": "filesystem:read_file",
-          "toolName": "read_file",
-          "serverId": "filesystem",
-          "enabled": false,
-          "permissions": {
-            "read": true,
-            "write": true,
-            "execute": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "5d19d8c5-1701-482a-8a3a-d84390047768",
-      "connectedAt": "2025-08-09T03:49:01.047Z",
+      "id": "3cf6d017-093e-4266-a299-d8d6ddda292a",
+      "connectedAt": "2025-08-17T02:30:01.857Z",
       "permissions": []
     },
     {
-      "id": "260ee0ca-251b-41f2-a643-c6f235a78acc",
-      "connectedAt": "2025-08-09T03:53:38.580Z",
-      "permissions": []
-    },
-    {
-      "id": "4e28912c-d7ba-41a3-aac0-f5ea6576895d",
-      "connectedAt": "2025-08-09T03:55:03.367Z",
+      "id": "d185b250-97ea-44f4-91c1-b6987651c19d",
+      "connectedAt": "2025-08-17T02:31:52.467Z",
       "permissions": []
     }
   ]

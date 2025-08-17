@@ -217,6 +217,42 @@ export class WebServer {
       }
     });
 
+    // Add new server endpoint
+    this.app.post('/api/servers/add', async (req, res) => {
+      try {
+        const serverConfig = req.body;
+        
+        // Generate unique ID for the new server
+        serverConfig.id = serverConfig.id || `server-${Date.now()}`;
+        
+        // Add to config and start server
+        if (this.proxyServer) {
+          await this.proxyServer.addServer(serverConfig);
+          res.json({ success: true, serverId: serverConfig.id });
+        } else {
+          res.status(500).json({ error: 'ProxyServer not available' });
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Remove server endpoint (permanently from config)
+    this.app.delete('/api/servers/:serverId/remove', async (req, res) => {
+      const { serverId } = req.params;
+      
+      try {
+        if (this.proxyServer) {
+          await this.proxyServer.removeServer(serverId);
+          res.json({ success: true });
+        } else {
+          res.status(500).json({ error: 'ProxyServer not available' });
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Config reload endpoint
     this.app.post('/api/config/reload', async (req, res) => {
       try {

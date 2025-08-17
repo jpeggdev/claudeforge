@@ -381,4 +381,51 @@ export class ProxyServer {
   async triggerConfigReload(): Promise<void> {
     await this.reloadConfig();
   }
+
+  async addServer(serverConfig: any): Promise<void> {
+    try {
+      // Add the new server to config
+      this.config.servers.push(serverConfig);
+      
+      // Save updated config to file
+      await this.saveConfig();
+      
+      // Start the new server
+      await this.serverManager.startServer(serverConfig);
+      
+      this.logManager.info(`Added and started new server: ${serverConfig.id}`);
+    } catch (error: any) {
+      this.logManager.error(`Failed to add server: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async removeServer(serverId: string): Promise<void> {
+    try {
+      // Stop the server if it's running
+      await this.serverManager.stopServer(serverId);
+      
+      // Remove from config
+      this.config.servers = this.config.servers.filter(s => s.id !== serverId);
+      
+      // Save updated config to file
+      await this.saveConfig();
+      
+      this.logManager.info(`Removed server: ${serverId}`);
+    } catch (error: any) {
+      this.logManager.error(`Failed to remove server: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async saveConfig(): Promise<void> {
+    try {
+      const configData = JSON.stringify(this.config, null, 2);
+      await fs.writeFile(this.configPath, configData, 'utf-8');
+      this.logManager.info('Configuration saved to file');
+    } catch (error: any) {
+      this.logManager.error(`Failed to save config: ${error.message}`);
+      throw error;
+    }
+  }
 }
