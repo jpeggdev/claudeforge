@@ -131,13 +131,13 @@ export function FirehosePanel() {
             <span className="text-sm">Reduce Noise</span>
           </label>
           <div className="flex-1" />
-          <Button size="sm" variant="outline" onClick={handleClear}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            Clear
+          <Button size="sm" variant="outline" onClick={handleClear} className="min-w-0">
+            <Trash2 className="h-4 w-4 mr-1 flex-shrink-0" />
+            <span className="truncate">Clear</span>
           </Button>
-          <Button size="sm" variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-1" />
-            Export
+          <Button size="sm" variant="outline" onClick={handleExport} className="min-w-0">
+            <Download className="h-4 w-4 mr-1 flex-shrink-0" />
+            <span className="truncate">Export</span>
           </Button>
         </div>
       </div>

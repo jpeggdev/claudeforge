@@ -60,9 +60,9 @@ export function SystemLogsPanel() {
             onChange={(e) => setFilter(e.target.value)}
             className="flex-1"
           />
-          <Button size="sm" variant="outline" onClick={() => setLogs([])}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            Clear
+          <Button size="sm" variant="outline" onClick={() => setLogs([])} className="min-w-0">
+            <Trash2 className="h-4 w-4 mr-1 flex-shrink-0" />
+            <span className="truncate">Clear</span>
           </Button>
         </div>
       </div>

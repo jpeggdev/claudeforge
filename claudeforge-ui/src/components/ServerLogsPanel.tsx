@@ -46,9 +46,9 @@ export function ServerLogsPanel({ server }: ServerLogsPanelProps) {
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center mb-3">
         <h3 className="font-medium">Server Logs: {server.name}</h3>
-        <Button size="sm" variant="outline" onClick={() => setLogs([])}>
-          <Trash2 className="h-4 w-4 mr-1" />
-          Clear
+        <Button size="sm" variant="outline" onClick={() => setLogs([])} className="min-w-0">
+          <Trash2 className="h-4 w-4 mr-1 flex-shrink-0" />
+          <span className="truncate">Clear</span>
         </Button>
       </div>
       <Card className="flex-1 overflow-hidden">

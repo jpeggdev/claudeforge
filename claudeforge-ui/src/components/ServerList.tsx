@@ -159,12 +159,12 @@ export function ServerList({ servers, selectedServer, onServerSelect, onRefresh 
       </ScrollArea>
       
       <Button 
-        className="mt-4 w-full" 
+        className="mt-4 w-full truncate" 
         onClick={() => setShowAddDialog(true)}
         variant="outline"
       >
-        <Plus className="h-4 w-4 mr-2" />
-        Add Server
+        <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+        <span className="truncate">Add Server</span>
       </Button>
 
       {showAddDialog && (

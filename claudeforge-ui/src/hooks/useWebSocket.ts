@@ -77,6 +77,15 @@ export function useWebSocket() {
       case 'stats':
         // Update stats
         break
+      case 'firehose':
+        // Handle firehose events
+        break
+      case 'firehose-stats':
+        // Handle firehose statistics
+        break
+      case 'status':
+        // Handle general status updates
+        break
       default:
         console.log('Unknown message type:', data.type)
     }

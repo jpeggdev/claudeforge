@@ -123,18 +123,20 @@ export function DebugInspectorPanel() {
               variant="outline" 
               onClick={() => setMessages([])}
               disabled={!debugEnabled}
+              className="min-w-0"
             >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Clear
+              <Trash2 className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">Clear</span>
             </Button>
             <Button 
               size="sm" 
               variant="outline" 
               onClick={handleExport}
               disabled={!debugEnabled}
+              className="min-w-0"
             >
-              <Download className="h-4 w-4 mr-1" />
-              Export
+              <Download className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">Export</span>
             </Button>
           </div>
         </div>
