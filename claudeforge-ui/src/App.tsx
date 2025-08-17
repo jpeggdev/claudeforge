@@ -10,8 +10,10 @@ import { ServerLogsPanel } from './components/ServerLogsPanel'
 import { FirehosePanel } from './components/FirehosePanel'
 import { DebugInspectorPanel } from './components/DebugInspectorPanel'
 import { SystemLogsPanel } from './components/SystemLogsPanel'
+import { ThemeToggle } from './components/ThemeToggle'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useAPI } from './hooks/useAPI'
+import { useTheme } from './hooks/useTheme'
 import type { Server } from './types'
 
 function App() {
@@ -19,6 +21,7 @@ function App() {
   const [servers, setServers] = useState<Server[]>([])
   const { isConnected } = useWebSocket()
   const { fetchServers, reloadConfig } = useAPI()
+  const { themeConfig } = useTheme()
 
   const loadServers = useCallback(async () => {
     const data = await fetchServers()
@@ -50,7 +53,7 @@ function App() {
       {/* Header - Fixed */}
       <header className="flex items-center justify-between px-6 py-3 border-b bg-background">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 gradient-purple rounded-lg flex items-center justify-center text-white font-bold glow-purple">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">
             CF
           </div>
           <div>
@@ -65,6 +68,14 @@ function App() {
             <div className={`inline-block w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
             {isConnected ? 'Connected' : 'Disconnected'}
           </Badge>
+          <ThemeToggle 
+            theme={themeConfig.theme}
+            onThemeChange={(theme) => {
+              // For now, just log the change
+              // In production, this would update the config via API
+              console.log('Theme changed to:', theme)
+            }}
+          />
           <Button 
             variant="outline" 
             size="sm"
@@ -108,10 +119,10 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Tabs defaultValue="tools" className="h-full flex flex-col">
               <TabsList className="grid w-full grid-cols-4 shrink-0">
-                <TabsTrigger value="tools" className="tab-gradient">Tools</TabsTrigger>
-                <TabsTrigger value="resources" className="tab-gradient">Resources</TabsTrigger>
-                <TabsTrigger value="prompts" className="tab-gradient">Prompts</TabsTrigger>
-                <TabsTrigger value="logs" className="tab-gradient">Server Logs</TabsTrigger>
+                <TabsTrigger value="tools">Tools</TabsTrigger>
+                <TabsTrigger value="resources">Resources</TabsTrigger>
+                <TabsTrigger value="prompts">Prompts</TabsTrigger>
+                <TabsTrigger value="logs">Server Logs</TabsTrigger>
               </TabsList>
               <TabsContent value="tools" className="flex-1 overflow-hidden mt-4">
                 <ToolsPanel server={selectedServerData} />
@@ -132,8 +143,8 @@ function App() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Tabs defaultValue="firehose" className="h-full flex flex-col">
               <TabsList className="grid w-full grid-cols-3 shrink-0">
-                <TabsTrigger value="firehose" className="gradient-pink text-white">Firehose</TabsTrigger>
-                <TabsTrigger value="debug" className="gradient-blue text-white">Debug Inspector</TabsTrigger>
+                <TabsTrigger value="firehose">Firehose</TabsTrigger>
+                <TabsTrigger value="debug">Debug Inspector</TabsTrigger>
                 <TabsTrigger value="system-logs">System Logs</TabsTrigger>
               </TabsList>
               <TabsContent value="firehose" className="flex-1 overflow-hidden mt-4">

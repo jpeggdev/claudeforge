@@ -16,6 +16,7 @@ import { PermissionManager } from './permission-manager.js';
 import { LogManager } from './log-manager.js';
 import { DebugManager } from './debug-manager.js';
 import { FirehoseManager } from './firehose-manager.js';
+import { HealthMonitor } from './health-monitor.js';
 import { ProxyConfig } from './types.js';
 import { ConfigValidator } from './config-validator.js';
 import fs from 'fs/promises';
@@ -29,6 +30,7 @@ export class ProxyServer {
   private logManager: LogManager;
   private debugManager: DebugManager;
   private firehoseManager: FirehoseManager;
+  private healthMonitor: HealthMonitor;
   private config: ProxyConfig;
   private currentSessionId: string | null = null;
   private configPath: string;
@@ -43,6 +45,14 @@ export class ProxyServer {
     this.serverManager = new ServerManager(logManager, debugManager, firehoseManager, config.docker);
     this.permissionManager = new PermissionManager(configPath);
     this.permissionManager.setDefaultPolicy(config.defaultPermissions === 'allow');
+    
+    // Initialize health monitor
+    this.healthMonitor = new HealthMonitor(
+      config.healthMonitor || {},
+      logManager,
+      firehoseManager
+    );
+    this.healthMonitor.setServerManager(this.serverManager);
 
     this.server = new Server({
       name: 'claudeforge',
@@ -198,6 +208,9 @@ export class ProxyServer {
         const server = await this.serverManager.startServer(serverConfig);
         if (server.status === 'error') {
           this.logManager.error(`Server ${serverConfig.name} started with error: ${server.error}`, serverConfig.id, serverConfig.name);
+        } else if (server.status === 'connected') {
+          // Start health monitoring for connected servers
+          this.healthMonitor.startMonitoring(server);
         }
       } catch (error: any) {
         // This should not happen anymore, but keep as safety
@@ -270,6 +283,7 @@ export class ProxyServer {
       for (const serverId of currentServerIds) {
         if (!newServerIds.has(serverId)) {
           this.logManager.info(`Stopping removed server: ${serverId}`);
+          this.healthMonitor.stopMonitoring(serverId);
           await this.serverManager.stopServer(serverId);
         }
       }
@@ -293,6 +307,7 @@ export class ProxyServer {
             this.logManager.info(`Retrying failed server: ${newServer.id}`);
           }
           
+          this.healthMonitor.stopMonitoring(newServer.id);
           await this.serverManager.stopServer(newServer.id);
           
           if (!(newServer as any).disabled) {
@@ -300,6 +315,9 @@ export class ProxyServer {
               const server = await this.serverManager.startServer(newServer);
               if (server.status === 'error') {
                 this.logManager.error(`Server ${newServer.name} started with error: ${server.error}`, newServer.id, newServer.name);
+              } else if (server.status === 'connected') {
+                // Start health monitoring for connected servers
+                this.healthMonitor.startMonitoring(server);
               }
             } catch (error: any) {
               this.logManager.error(`Failed to restart server ${newServer.name}: ${error.message}`, newServer.id, newServer.name);
@@ -322,6 +340,9 @@ export class ProxyServer {
               const server = await this.serverManager.startServer(newServer);
               if (server.status === 'error') {
                 this.logManager.error(`Server ${newServer.name} started with error: ${server.error}`, newServer.id, newServer.name);
+              } else if (server.status === 'connected') {
+                // Start health monitoring for connected servers
+                this.healthMonitor.startMonitoring(server);
               }
             } catch (error: any) {
               this.logManager.error(`Failed to start server ${newServer.name}: ${error.message}`, newServer.id, newServer.name);
@@ -333,6 +354,11 @@ export class ProxyServer {
       // Update config
       this.config = newConfig;
       this.permissionManager.setDefaultPolicy(newConfig.defaultPermissions === 'allow');
+      
+      // Update health monitor config
+      if (newConfig.healthMonitor) {
+        this.healthMonitor.updateConfig(newConfig.healthMonitor);
+      }
       
       this.logManager.info('Configuration reloaded successfully');
     } catch (error: any) {
@@ -352,6 +378,7 @@ export class ProxyServer {
       this.permissionManager.removeSession(this.currentSessionId);
     }
 
+    this.healthMonitor.stopAll();
     await this.serverManager.stopAllServers();
     await this.server.close();
     
@@ -362,10 +389,14 @@ export class ProxyServer {
     return this.serverManager;
   }
 
+  getHealthMonitor(): HealthMonitor {
+    return this.healthMonitor;
+  }
+
   getPermissionManager(): PermissionManager {
     return this.permissionManager;
   }
-  
+
   getConfig(): ProxyConfig {
     return this.config;
   }
@@ -441,7 +472,8 @@ export class ProxyServer {
 
   async removeServer(serverId: string): Promise<void> {
     try {
-      // Stop the server if it's running
+      // Stop health monitoring and the server if it's running
+      this.healthMonitor.stopMonitoring(serverId);
       await this.serverManager.stopServer(serverId);
       
       // Remove from config

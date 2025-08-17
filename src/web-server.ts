@@ -254,6 +254,29 @@ export class WebServer {
       }
     });
 
+    // Theme configuration endpoint
+    this.app.get('/api/config/theme', (req, res) => {
+      try {
+        if (this.proxyServer) {
+          const config = this.proxyServer.getConfig();
+          res.json({
+            theme: config.ui?.theme || 'dark',
+            accentColor: config.ui?.accentColor || '262 83% 58%',
+            radius: config.ui?.radius || '0.75rem'
+          });
+        } else {
+          // Return defaults if proxy server not available
+          res.json({
+            theme: 'dark',
+            accentColor: '262 83% 58%',
+            radius: '0.75rem'
+          });
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Config reload endpoint
     this.app.post('/api/config/reload', async (req, res) => {
       try {
@@ -414,6 +437,66 @@ export class WebServer {
       req.on('close', () => {
         this.debugManager.removeListener('message', sendMessage);
       });
+    });
+
+    // Health Monitor API endpoints
+    this.app.get('/api/health/status', (req, res) => {
+      if (!this.proxyServer) {
+        res.status(503).json({ error: 'Proxy server not available' });
+        return;
+      }
+      const healthMonitor = this.proxyServer.getHealthMonitor();
+      const status = healthMonitor.getHealthStatus();
+      res.json(status);
+    });
+
+    this.app.get('/api/health/status/:serverId', (req, res) => {
+      if (!this.proxyServer) {
+        res.status(503).json({ error: 'Proxy server not available' });
+        return;
+      }
+      const { serverId } = req.params;
+      const healthMonitor = this.proxyServer.getHealthMonitor();
+      const status = healthMonitor.getHealthStatus(serverId);
+      if (!status) {
+        res.status(404).json({ error: 'Server not found or not monitored' });
+        return;
+      }
+      res.json(status);
+    });
+
+    this.app.post('/api/health/check/:serverId', async (req, res) => {
+      if (!this.proxyServer) {
+        res.status(503).json({ error: 'Proxy server not available' });
+        return;
+      }
+      const { serverId } = req.params;
+      const healthMonitor = this.proxyServer.getHealthMonitor();
+      try {
+        const result = await healthMonitor.manualHealthCheck(serverId);
+        res.json(result);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/health/config', (req, res) => {
+      if (!this.proxyServer) {
+        res.status(503).json({ error: 'Proxy server not available' });
+        return;
+      }
+      const healthMonitor = this.proxyServer.getHealthMonitor();
+      res.json(healthMonitor.getConfig());
+    });
+
+    this.app.post('/api/health/config', (req, res) => {
+      if (!this.proxyServer) {
+        res.status(503).json({ error: 'Proxy server not available' });
+        return;
+      }
+      const healthMonitor = this.proxyServer.getHealthMonitor();
+      healthMonitor.updateConfig(req.body);
+      res.json({ success: true, config: healthMonitor.getConfig() });
     });
 
     // Firehose API endpoints
@@ -634,14 +717,31 @@ export class WebServer {
 
       const interval = setInterval(() => {
         const servers = this.serverManager.getAllServers();
+        let healthStatus: any[] = [];
+        
+        // Include health status if proxy server is available
+        if (this.proxyServer) {
+          const healthMonitor = this.proxyServer.getHealthMonitor();
+          healthStatus = healthMonitor.getHealthStatus() as any[] || [];
+        }
+        
         ws.send(JSON.stringify({
           type: 'status',
-          servers: servers.map(s => ({
-            id: s.id,
-            name: s.config.name,
-            status: s.status,
-            error: s.error
-          }))
+          servers: servers.map(s => {
+            const health = healthStatus.find(h => h.serverId === s.id);
+            return {
+              id: s.id,
+              name: s.config.name,
+              status: s.status,
+              error: s.error,
+              health: health ? {
+                status: health.status,
+                lastCheck: health.lastCheck,
+                responseTime: health.responseTime,
+                consecutiveFailures: health.consecutiveFailures
+              } : undefined
+            };
+          })
         }));
       }, 2000);
 
@@ -667,6 +767,16 @@ export class WebServer {
         }
       };
 
+      // Send health check events to WebSocket clients
+      const sendHealthEvent = (healthStatus: any) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'health-check',
+            health: healthStatus
+          }));
+        }
+      };
+
       // Send firehose stats periodically
       const statsInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -679,6 +789,12 @@ export class WebServer {
 
       const unsubscribe = this.logManager.onLog(sendLog);
       this.firehoseManager.on('event', sendFirehoseEvent);
+      
+      // Subscribe to health monitor events if available
+      if (this.proxyServer) {
+        const healthMonitor = this.proxyServer.getHealthMonitor();
+        healthMonitor.on('health-check', sendHealthEvent);
+      }
 
       ws.on('message', (data) => {
         this.firehoseManager.captureWebSocketMessage(clientId, 'in', data.toString());
@@ -691,6 +807,12 @@ export class WebServer {
         clearInterval(statsInterval);
         unsubscribe();
         this.firehoseManager.removeListener('event', sendFirehoseEvent);
+        
+        // Unsubscribe from health monitor events
+        if (this.proxyServer) {
+          const healthMonitor = this.proxyServer.getHealthMonitor();
+          healthMonitor.removeListener('health-check', sendHealthEvent);
+        }
       });
 
       ws.on('error', (error) => {

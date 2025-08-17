@@ -139,6 +139,8 @@ class MCPProxyManager {
                 this.updateServerStatuses(data.servers);
             } else if (data.type === 'log') {
                 this.addLog(data.log);
+            } else if (data.type === 'health-check') {
+                this.handleHealthCheckEvent(data.health);
             } else if (data.type === 'firehose') {
                 this.handleFirehoseEvent(data.event);
             } else if (data.type === 'firehose-stats') {
@@ -219,9 +221,36 @@ class MCPProxyManager {
             if (server) {
                 server.status = status.status;
                 server.error = status.error;
+                server.health = status.health; // Store health information
             }
         });
         this.renderServerList();
+    }
+
+    handleHealthCheckEvent(health) {
+        // Update the health status for the specific server
+        const server = this.servers.find(s => s.id === health.serverId);
+        if (server) {
+            server.health = {
+                status: health.status,
+                lastCheck: health.lastCheck,
+                responseTime: health.responseTime,
+                consecutiveFailures: health.consecutiveFailures
+            };
+            this.renderServerList();
+            
+            // Log health events to system logs
+            if (health.status === 'unhealthy') {
+                this.addLog({
+                    id: `health-${Date.now()}`,
+                    timestamp: new Date(),
+                    level: 'error',
+                    serverId: health.serverId,
+                    serverName: health.serverName,
+                    message: `Server health check failed: ${health.error || 'Unknown error'}`
+                });
+            }
+        }
     }
 
     updateStats() {
@@ -316,8 +345,21 @@ class MCPProxyManager {
             }
 
             let statusInfo = '';
+            let healthIndicator = '';
+            
             if (server.status === 'connected') {
                 statusInfo = `${server.tools?.length || 0} tools • ${server.resources?.length || 0} resources`;
+                
+                // Add health status indicator
+                if (server.health) {
+                    if (server.health.status === 'healthy') {
+                        healthIndicator = `<span style="color: var(--text-success); margin-left: 0.5rem;" title="Healthy - ${server.health.responseTime || 0}ms">✓</span>`;
+                    } else if (server.health.status === 'degraded') {
+                        healthIndicator = `<span style="color: var(--text-warning); margin-left: 0.5rem;" title="Degraded - ${server.health.consecutiveFailures} failures">⚠</span>`;
+                    } else if (server.health.status === 'unhealthy') {
+                        healthIndicator = `<span style="color: var(--text-danger); margin-left: 0.5rem;" title="Unhealthy - Auto-restart pending">✗</span>`;
+                    }
+                }
             } else if (server.status === 'disabled') {
                 statusInfo = `Disabled${server.error && server.error !== 'Server is disabled' ? `: ${server.error}` : ''}`;
             } else if (server.status === 'error') {
@@ -329,10 +371,13 @@ class MCPProxyManager {
             li.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div style="flex: 1;">
-                        <div class="server-name">${server.name}</div>
+                        <div class="server-name">${server.name}${healthIndicator}</div>
                         <div class="server-info">${statusInfo}</div>
                     </div>
                     <div class="server-actions" style="display: flex; gap: 0.25rem;">
+                        <button class="server-action-btn health-btn" data-server-id="${server.id}" title="Check health">
+                            ❤️
+                        </button>
                         <button class="server-action-btn refresh-btn" data-server-id="${server.id}" title="Refresh server">
                             🔄
                         </button>
@@ -348,6 +393,13 @@ class MCPProxyManager {
                 if (!e.target.closest('button')) {
                     await this.selectServer(server);
                 }
+            });
+
+            // Handle health check button
+            const healthBtn = li.querySelector('.health-btn');
+            healthBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.checkServerHealth(server.id);
             });
 
             // Handle refresh button
@@ -1384,6 +1436,35 @@ class MCPProxyManager {
         
         // Re-apply filters
         this.updateFirehoseDisplay();
+    }
+
+    async checkServerHealth(serverId) {
+        try {
+            const response = await fetch(`/api/health/check/${serverId}`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to check server health: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            // Show health status in an alert or update UI
+            const healthMsg = `Server Health Check:\n` +
+                `Status: ${result.status}\n` +
+                `Response Time: ${result.responseTime || 'N/A'}ms\n` +
+                `Last Check: ${new Date(result.lastCheck).toLocaleString()}\n` +
+                `Consecutive Failures: ${result.consecutiveFailures}`;
+            
+            alert(healthMsg);
+            
+            // Reload servers to update health status
+            await this.loadServers();
+        } catch (error) {
+            console.error('Failed to check server health:', error);
+            alert(`Failed to check server health: ${error.message}`);
+        }
     }
 
     async refreshServer(serverId) {

@@ -97,9 +97,7 @@ export function ServerList({ servers, selectedServer, onServerSelect, onRefresh 
                       }`} />
                       <Badge
                         variant={server.status === 'connected' ? "default" : "secondary"}
-                        className={`text-xs ${
-                          server.status === 'connected' ? 'gradient-green text-white' : ''
-                        }`}
+                        className="text-xs"
                       >
                         {server.status === 'connected' ? 'Connected' : 'Disconnected'}
                       </Badge>

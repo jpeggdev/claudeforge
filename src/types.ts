@@ -39,6 +39,21 @@ export interface ProxyConfig {
   webPort: number;
   servers: MCPServerConfig[];
   defaultPermissions: 'allow' | 'deny';
+  ui?: {
+    theme?: 'light' | 'dark' | 'system';
+    accentColor?: string; // HSL values like "262 83% 58%"
+    radius?: string; // Border radius like "0.5rem" or "0.75rem"
+  };
+  healthMonitor?: {
+    enabled?: boolean;
+    interval?: number;  // milliseconds between health checks
+    timeout?: number;   // milliseconds to wait for health check response
+    maxRetries?: number; // max consecutive failures before marking unhealthy
+    autoRestart?: boolean;
+    restartDelay?: number; // milliseconds to wait before restarting
+    maxRestarts?: number; // max restart attempts within restartWindow
+    restartWindow?: number; // milliseconds - window for counting restart attempts
+  };
   docker?: {
     enabled?: boolean;           // Enable Docker support globally
     autoContainerize?: boolean;  // Automatically containerize stdio servers
