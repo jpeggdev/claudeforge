@@ -13,6 +13,7 @@ import { ProxyServer } from './proxy-server.js';
 import { SSEMcpHandler } from './sse-mcp-handler.js';
 import { StreamableHttpHandler } from './streamable-http-handler.js';
 import { ToolPermission, LogEntry } from './types.js';
+import { validateConfigFile, ConfigValidator } from './config-validator.js';
 
 export class WebServer {
   private app: Express;
@@ -267,6 +268,39 @@ export class WebServer {
       }
     });
 
+    // Config validation endpoint - validate current config file
+    this.app.get('/api/config/validate', async (req, res) => {
+      try {
+        const configPath = process.env.CLAUDEFORGE_CONFIG || join(process.cwd(), 'config.json');
+        const validation = await validateConfigFile(configPath);
+        
+        res.json({
+          valid: validation.valid,
+          errors: validation.errors,
+          warnings: validation.warnings,
+          configPath
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Config validation endpoint - validate posted config
+    this.app.post('/api/config/validate', async (req, res) => {
+      try {
+        const validator = new ConfigValidator();
+        const validation = await validator.validateConfig(req.body);
+        
+        res.json({
+          valid: validation.valid,
+          errors: validation.errors,
+          warnings: validation.warnings
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // Log endpoints
     this.app.get('/api/logs', (req, res) => {
       const { level, serverId, limit } = req.query;
@@ -455,6 +489,140 @@ export class WebServer {
       req.on('close', () => {
         clearInterval(heartbeat);
       });
+    });
+
+    // Docker API endpoints
+    this.app.get('/api/docker/status', async (req, res) => {
+      try {
+        const dockerManager = this.serverManager.getDockerManager();
+        if (!dockerManager) {
+          res.json({ 
+            enabled: false, 
+            message: 'Docker support is not enabled' 
+          });
+          return;
+        }
+
+        const containers = await dockerManager.listContainers();
+        res.json({
+          enabled: true,
+          containers: containers.map(c => ({
+            id: c.id,
+            containerId: c.containerId,
+            containerName: c.containerName,
+            image: c.image,
+            status: c.status,
+            ports: c.ports,
+            createdAt: c.createdAt,
+            error: c.error
+          }))
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/docker/containerize/:serverId', async (req, res) => {
+      try {
+        const { serverId } = req.params;
+        const dockerManager = this.serverManager.getDockerManager();
+        
+        if (!dockerManager) {
+          res.status(400).json({ error: 'Docker support is not enabled' });
+          return;
+        }
+
+        const server = this.serverManager.getServer(serverId);
+        if (!server) {
+          res.status(404).json({ error: 'Server not found' });
+          return;
+        }
+
+        const containerInfo = await dockerManager.containerizeServer(server.config);
+        res.json({
+          success: true,
+          container: {
+            id: containerInfo.id,
+            containerId: containerInfo.containerId,
+            containerName: containerInfo.containerName,
+            image: containerInfo.image,
+            status: containerInfo.status,
+            ports: containerInfo.ports
+          }
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.delete('/api/docker/containers/:serverId', async (req, res) => {
+      try {
+        const { serverId } = req.params;
+        const dockerManager = this.serverManager.getDockerManager();
+        
+        if (!dockerManager) {
+          res.status(400).json({ error: 'Docker support is not enabled' });
+          return;
+        }
+
+        await dockerManager.stopContainer(serverId);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/docker/containers/:serverId/logs', async (req, res) => {
+      try {
+        const { serverId } = req.params;
+        const { tail } = req.query;
+        const dockerManager = this.serverManager.getDockerManager();
+        
+        if (!dockerManager) {
+          res.status(400).json({ error: 'Docker support is not enabled' });
+          return;
+        }
+
+        const logs = await dockerManager.getContainerLogs(
+          serverId, 
+          tail ? parseInt(tail as string) : 100
+        );
+        res.json({ logs });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/docker/cleanup', async (req, res) => {
+      try {
+        const dockerManager = this.serverManager.getDockerManager();
+        
+        if (!dockerManager) {
+          res.status(400).json({ error: 'Docker support is not enabled' });
+          return;
+        }
+
+        await dockerManager.cleanupContainers();
+        res.json({ success: true, message: 'Cleaned up stopped containers' });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    this.app.post('/api/docker/prune', async (req, res) => {
+      try {
+        const dockerManager = this.serverManager.getDockerManager();
+        
+        if (!dockerManager) {
+          res.status(400).json({ error: 'Docker support is not enabled' });
+          return;
+        }
+
+        await dockerManager.pruneImages();
+        res.json({ success: true, message: 'Pruned unused Docker images' });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
     });
   }
 

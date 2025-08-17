@@ -5,6 +5,7 @@ import { LogManager } from './log-manager.js';
 import { DebugManager } from './debug-manager.js';
 import { FirehoseManager } from './firehose-manager.js';
 import { ProxyConfig } from './types.js';
+import { validateAndLoadConfig, ValidationResult } from './config-validator.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,8 +16,26 @@ async function loadConfig(): Promise<ProxyConfig> {
   const configPath = process.env.CLAUDEFORGE_CONFIG || path.join(__dirname, '..', 'config.json');
   
   try {
-    const configData = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(configData);
+    await fs.access(configPath);
+    
+    const { config, validation } = await validateAndLoadConfig(configPath);
+    
+    if (!validation.valid) {
+      console.error('Configuration validation failed:');
+      for (const error of validation.errors) {
+        console.error(`  ❌ ${error.field}: ${error.message}`);
+      }
+      process.exit(1);
+    }
+    
+    if (validation.warnings.length > 0) {
+      console.log('Configuration warnings:');
+      for (const warning of validation.warnings) {
+        console.log(`  ⚠️  ${warning.field}: ${warning.message}`);
+      }
+    }
+    
+    return config!;
   } catch (error) {
     console.log('No config file found, using default configuration');
     return {
@@ -90,9 +109,24 @@ async function main() {
     process.on('SIGUSR2', async () => {
       logManager.info('Received SIGUSR2, reloading configuration...');
       try {
-        // Reload config without restart
-        const newConfig = await loadConfig();
-        proxyServer.updateConfig(newConfig);
+        // Validate and reload config without restart
+        const { config: newConfig, validation } = await validateAndLoadConfig(configPath);
+        
+        if (!validation.valid) {
+          logManager.error('Configuration validation failed during reload');
+          for (const error of validation.errors) {
+            logManager.error(`Validation error: ${error.field}: ${error.message}`);
+          }
+          return;
+        }
+        
+        if (validation.warnings.length > 0) {
+          for (const warning of validation.warnings) {
+            logManager.warning(`Config warning: ${warning.field}: ${warning.message}`);
+          }
+        }
+        
+        proxyServer.updateConfig(newConfig!);
         logManager.info('Configuration reloaded successfully');
       } catch (error) {
         logManager.error('Failed to reload configuration', undefined, undefined, error);

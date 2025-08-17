@@ -11,6 +11,8 @@ import { DebugManager } from './debug-manager.js';
 import { FirehoseManager } from './firehose-manager.js';
 import { DebugTransportWrapper } from './debug-transport-wrapper.js';
 import { StdioToolHandler } from './stdio-tool-handler.js';
+import { DockerManager, ContainerizedServer } from './docker-manager.js';
+import { DockerTransport } from './transports/docker-transport.js';
 // Polyfill for EventSource in Node.js
 import { EventSource } from 'eventsource';
 (global as any).EventSource = EventSource;
@@ -22,12 +24,30 @@ export class ServerManager {
   private debugManager: DebugManager;
   private firehoseManager: FirehoseManager;
   private stdioToolHandler: StdioToolHandler;
+  private dockerManager: DockerManager | null = null;
+  private dockerConfig: any;
 
-  constructor(logManager: LogManager, debugManager: DebugManager, firehoseManager: FirehoseManager) {
+  constructor(logManager: LogManager, debugManager: DebugManager, firehoseManager: FirehoseManager, dockerConfig?: any) {
     this.logManager = logManager;
     this.debugManager = debugManager;
     this.firehoseManager = firehoseManager;
     this.stdioToolHandler = new StdioToolHandler(logManager);
+    this.dockerConfig = dockerConfig;
+    
+    if (dockerConfig?.enabled) {
+      this.initializeDocker();
+    }
+  }
+
+  private async initializeDocker(): Promise<void> {
+    try {
+      this.dockerManager = new DockerManager(this.logManager, this.dockerConfig);
+      await this.dockerManager.initialize();
+      this.logManager.info('Docker support initialized', 'server-manager');
+    } catch (error: any) {
+      this.logManager.error('Failed to initialize Docker support', 'server-manager', undefined, error);
+      this.dockerManager = null;
+    }
   }
 
   registerDisabledServer(config: MCPServerConfig): void {
@@ -70,6 +90,13 @@ export class ServerManager {
     try {
       let transport: any;
 
+      // Check if we should auto-containerize stdio servers
+      if (config.transport === 'stdio' && 
+          (config.docker?.enabled || (this.dockerConfig?.autoContainerize && this.dockerManager))) {
+        config = { ...config, transport: 'docker' as any };
+        this.logManager.info(`Auto-containerizing stdio server: ${config.name}`, config.id, config.name);
+      }
+
       switch (config.transport) {
         case 'stdio':
           if (!config.command) throw new Error('stdio transport requires command');
@@ -100,6 +127,24 @@ export class ServerManager {
           if (!httpUrl) throw new Error('HTTP transport requires endpoint or url');
           this.logManager.info(`Connecting to HTTP endpoint: ${httpUrl}`, config.id, config.name);
           transport = new HttpClientTransport(new URL(httpUrl));
+          break;
+
+        case 'docker':
+          // Check if Docker is enabled and available
+          if (!this.dockerManager) {
+            throw new Error('Docker support is not enabled or available');
+          }
+          
+          this.logManager.info(`Containerizing server: ${config.name}`, config.id, config.name);
+          
+          // Containerize the server
+          const containerInfo = await this.dockerManager.containerizeServer(config);
+          
+          // Create Docker transport
+          transport = new DockerTransport(containerInfo, this.logManager);
+          
+          // Store container info on the server
+          (server as any).containerInfo = containerInfo;
           break;
 
         default:
@@ -228,6 +273,16 @@ export class ServerManager {
         });
       }
 
+      // Clean up Docker container if this was a containerized server
+      if ((server as any).containerInfo && this.dockerManager) {
+        try {
+          await this.dockerManager.stopContainer(serverId);
+          this.logManager.info(`Docker container stopped for server`, serverId, server.config.name);
+        } catch (error: any) {
+          this.logManager.error(`Failed to stop Docker container`, serverId, server.config.name, error);
+        }
+      }
+
       server.status = 'disconnected';
       this.logManager.info(`Stopped successfully`, serverId, server.config.name);
     } catch (error: any) {
@@ -253,6 +308,10 @@ export class ServerManager {
 
   getAllServers(): ConnectedServer[] {
     return Array.from(this.servers.values());
+  }
+
+  getDockerManager(): DockerManager | null {
+    return this.dockerManager;
   }
 
   async callTool(serverId: string, toolName: string, args: any): Promise<any> {

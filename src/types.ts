@@ -4,10 +4,23 @@ export interface MCPServerConfig {
   command?: string;  // Optional for HTTP transports
   args?: string[];
   env?: Record<string, string>;
-  transport: 'stdio' | 'sse' | 'websocket' | 'http' | 'streamable-http';
+  transport: 'stdio' | 'sse' | 'websocket' | 'http' | 'streamable-http' | 'docker';
   endpoint?: string;
   url?: string;  // Alternative to endpoint for HTTP transports
   timeout?: number;  // Timeout in milliseconds for tool/resource/prompt calls (default: 30000)
+  docker?: {
+    enabled?: boolean;  // Enable Docker containerization for this server
+    image?: string;     // Custom Docker image to use
+    buildContext?: string; // Path to build context if custom Dockerfile
+    dockerfile?: string;   // Path to custom Dockerfile
+    volumes?: string[];    // Volume mounts
+    ports?: string[];      // Additional port mappings
+    networkMode?: string;  // Network mode
+    resources?: {
+      memory?: string;     // Memory limit (e.g., "512m", "1g")
+      cpus?: string;       // CPU limit (e.g., "0.5", "2")
+    };
+  };
 }
 
 export interface ToolPermission {
@@ -26,6 +39,25 @@ export interface ProxyConfig {
   webPort: number;
   servers: MCPServerConfig[];
   defaultPermissions: 'allow' | 'deny';
+  docker?: {
+    enabled?: boolean;           // Enable Docker support globally
+    autoContainerize?: boolean;  // Automatically containerize stdio servers
+    network?: string;            // Docker network name
+    registry?: string;           // Docker registry for images
+    baseImages?: {               // Base images for different languages
+      node?: string;
+      python?: string;
+      go?: string;
+      rust?: string;
+    };
+    defaultVolumes?: string[];   // Default volumes for all containers
+    defaultEnvironment?: Record<string, string>; // Default env vars
+    defaultLabels?: Record<string, string>;      // Default labels
+    defaultResources?: {         // Default resource limits
+      memory?: string;
+      cpus?: string;
+    };
+  };
 }
 
 export interface ConnectedServer {

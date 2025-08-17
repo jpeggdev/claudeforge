@@ -17,6 +17,7 @@ import { LogManager } from './log-manager.js';
 import { DebugManager } from './debug-manager.js';
 import { FirehoseManager } from './firehose-manager.js';
 import { ProxyConfig } from './types.js';
+import { ConfigValidator } from './config-validator.js';
 import fs from 'fs/promises';
 import { watch } from 'fs';
 import path from 'path';
@@ -39,7 +40,7 @@ export class ProxyServer {
     this.debugManager = debugManager;
     this.firehoseManager = firehoseManager;
     this.configPath = configPath || path.join(process.cwd(), 'config.json');
-    this.serverManager = new ServerManager(logManager, debugManager, firehoseManager);
+    this.serverManager = new ServerManager(logManager, debugManager, firehoseManager, config.docker);
     this.permissionManager = new PermissionManager(configPath);
     this.permissionManager.setDefaultPolicy(config.defaultPermissions === 'allow');
 
@@ -238,9 +239,26 @@ export class ProxyServer {
 
   async reloadConfig(): Promise<void> {
     try {
-      // Read new config
+      // Read and validate new config
       const configData = await fs.readFile(this.configPath, 'utf-8');
       const newConfig = JSON.parse(configData) as ProxyConfig;
+      
+      // Validate the new configuration
+      const validator = new ConfigValidator();
+      const validation = await validator.validateConfig(newConfig);
+      
+      if (!validation.valid) {
+        const errorMessages = validation.errors.map(e => `${e.field}: ${e.message}`).join(', ');
+        this.logManager.error(`Configuration validation failed: ${errorMessages}`);
+        throw new Error(`Invalid configuration: ${errorMessages}`);
+      }
+      
+      // Log any warnings
+      if (validation.warnings.length > 0) {
+        for (const warning of validation.warnings) {
+          this.logManager.warning(`Config warning: ${warning.field}: ${warning.message}`);
+        }
+      }
       
       this.logManager.info('Reloading configuration...');
       
@@ -384,6 +402,27 @@ export class ProxyServer {
 
   async addServer(serverConfig: any): Promise<void> {
     try {
+      // Validate the server configuration first
+      const validator = new ConfigValidator();
+      const tempConfig = {
+        ...this.config,
+        servers: [...this.config.servers, serverConfig]
+      };
+      
+      const validation = await validator.validateConfig(tempConfig);
+      
+      if (!validation.valid) {
+        const errorMessages = validation.errors.map(e => `${e.field}: ${e.message}`).join(', ');
+        throw new Error(`Invalid server configuration: ${errorMessages}`);
+      }
+      
+      // Log any warnings
+      if (validation.warnings.length > 0) {
+        for (const warning of validation.warnings) {
+          this.logManager.warning(`Config warning: ${warning.field}: ${warning.message}`);
+        }
+      }
+      
       // Add the new server to config
       this.config.servers.push(serverConfig);
       

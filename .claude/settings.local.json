@@ -10,7 +10,8 @@
       "Bash(systemctl:*)",
       "Bash(npm search:*)",
       "Bash(npm install:*)",
-      "WebFetch(domain:www.heroui.com)"
+      "WebFetch(domain:www.heroui.com)",
+      "Bash(docker:*)"
     ],
     "deny": []
   }
