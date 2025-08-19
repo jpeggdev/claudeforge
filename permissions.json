@@ -3,14 +3,21 @@
   "globalPermissions": [],
   "sessions": [
     {
-      "id": "e387c28d-cd8b-4d5e-919f-fc598ba159f7",
-      "connectedAt": "2025-08-17T21:43:56.861Z",
-      "permissions": []
-    },
-    {
-      "id": "de7fda99-9b6c-480e-b24e-6836afcc9986",
-      "connectedAt": "2025-08-17T22:09:27.405Z",
-      "permissions": []
+      "id": "f6d9da04-c674-44c1-8c5f-fd534a99d05c",
+      "connectedAt": "2025-08-18T07:48:59.567Z",
+      "permissions": [
+        {
+          "key": "filesystem:read_file",
+          "toolName": "read_file",
+          "serverId": "filesystem",
+          "enabled": false,
+          "permissions": {
+            "read": true,
+            "write": true,
+            "execute": true
+          }
+        }
+      ]
     }
   ]
 }

@@ -126,7 +126,7 @@ export class ServerManager {
           const httpUrl = config.endpoint || config.url;
           if (!httpUrl) throw new Error('HTTP transport requires endpoint or url');
           this.logManager.info(`Connecting to HTTP endpoint: ${httpUrl}`, config.id, config.name);
-          transport = new HttpClientTransport(new URL(httpUrl));
+          transport = new HttpClientTransport(new URL(httpUrl), config.headers);
           break;
 
         case 'docker':

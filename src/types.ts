@@ -7,6 +7,7 @@ export interface MCPServerConfig {
   transport: 'stdio' | 'sse' | 'websocket' | 'http' | 'streamable-http' | 'docker';
   endpoint?: string;
   url?: string;  // Alternative to endpoint for HTTP transports
+  headers?: Record<string, string>;  // Optional headers for HTTP transports (e.g., Authorization)
   timeout?: number;  // Timeout in milliseconds for tool/resource/prompt calls (default: 30000)
   docker?: {
     enabled?: boolean;  // Enable Docker containerization for this server

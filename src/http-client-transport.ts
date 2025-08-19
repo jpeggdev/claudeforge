@@ -9,6 +9,7 @@ import fetch from 'node-fetch';
 export class HttpClientTransport implements Transport {
   private url: URL;
   private closed = false;
+  private customHeaders: Record<string, string>;
   sessionId: string | undefined = undefined;
   
   // Transport interface properties
@@ -16,8 +17,9 @@ export class HttpClientTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
 
-  constructor(url: URL) {
+  constructor(url: URL, customHeaders?: Record<string, string>) {
     this.url = url;
+    this.customHeaders = customHeaders || {};
   }
 
   async start(): Promise<void> {
@@ -29,6 +31,7 @@ export class HttpClientTransport implements Transport {
         method: 'OPTIONS',
         headers: {
           'Accept': 'application/json, text/event-stream',
+          ...this.customHeaders,
         },
       });
       
@@ -51,6 +54,7 @@ export class HttpClientTransport implements Transport {
       const headers: any = {
         'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream',
+        ...this.customHeaders,
       };
       
       // Include session ID if we have one
